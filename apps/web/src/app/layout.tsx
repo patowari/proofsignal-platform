@@ -28,9 +28,26 @@ const sourceSerif = Source_Serif_4({
 });
 
 export const metadata: Metadata = {
-  title: "Evidence-Backed Verification",
+  title: {
+    default: "তথ্য যাচাই — Evidence Check",
+    template: "%s · তথ্য যাচাই",
+  },
   description:
-    "Submit a claim, article, image, or video and see what the available evidence establishes — with sources you can check yourself.",
+    "Submit a claim, article, image, or video and see what the available evidence establishes — with sources you can check yourself. সত্য জানুন, গুজব থামান।",
+  icons: {
+    icon: [
+      { url: "/favicon.ico", sizes: "any" },
+      { url: "/favicon-32x32.png", type: "image/png", sizes: "32x32" },
+      { url: "/favicon-16x16.png", type: "image/png", sizes: "16x16" },
+    ],
+    apple: "/apple-touch-icon.png",
+  },
+  openGraph: {
+    title: "তথ্য যাচাই — Evidence Check",
+    description: "সত্য জানুন, গুজব থামান। Evidence-backed verification.",
+    images: ["/logo.png"],
+    type: "website",
+  },
 };
 
 export default function RootLayout({

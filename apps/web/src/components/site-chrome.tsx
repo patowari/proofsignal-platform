@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import Link from "next/link";
 import { LanguageSwitcher } from "./language-switcher";
 import { useLocale } from "./locale-provider";
@@ -20,8 +21,17 @@ export function SiteChrome({ children }: { children: React.ReactNode }) {
 
       <header className="border-b border-rule">
         <div className="mx-auto flex max-w-5xl items-center justify-between gap-4 px-5 py-4">
-          <Link href="/" className="font-serif text-lg font-semibold tracking-tight">
-            {t("siteName")}
+          <Link href="/" className="flex items-center" aria-label={t("siteName")}>
+            {/* priority: the logo is above the fold, so lazy-loading it would
+                leave the header visibly empty on first paint. */}
+            <Image
+              src="/logo.png"
+              alt={t("siteName")}
+              width={1774}
+              height={887}
+              priority
+              className="h-9 w-auto sm:h-10"
+            />
           </Link>
           <div className="flex items-center gap-4">
             <nav aria-label="Main">

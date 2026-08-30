@@ -18,21 +18,32 @@ through, and when the evidence is insufficient the honest answer is `UNVERIFIED`
 
 V1 is **in progress**. This table is the honest state of the build, not a plan.
 
-| Area                                                 | Status                  |
-| ---------------------------------------------------- | ----------------------- |
-| Documentation, project rules                         | ✅ Done                 |
-| SSRF-safe fetch layer                                | ✅ Done — 131 tests    |
-| Prompt-injection isolation                           | ✅ Done — 35 tests     |
-| Domain models (15 tables)                            | ✅ Done                 |
-| Deterministic scoring engine                         | ✅ Done — 44 tests     |
-| FastAPI app, API endpoints                           | ⬜ Not started          |
-| Job queue and worker                                 | ⬜ Not started          |
-| Claim extraction, retrieval, evidence analysis       | ⬜ Not started          |
-| **Frontend (composer, progress, report page)** | ⬜**Not started** |
-| Image / video / social pipelines                     | ⬜ Not started          |
+| Area | Status |
+|---|---|
+| Documentation, project rules | Done |
+| SSRF-safe fetch layer | Done — 131 tests |
+| Prompt-injection isolation | Done — 35 tests |
+| Domain models (15 tables) | Done |
+| Deterministic scoring engine | Done — 44 tests |
+| Infrastructure (Postgres+pgvector, Redis, MinIO) | Done — running, migrated |
+| FastAPI app, 11 API endpoints | Done — verified live |
+| Job queue and worker | Done — retries, dead-letter, crash recovery |
+| Claim extraction (rule-based, EN + BN) | Done — 40 tests |
+| **Frontend (composer, progress, report)** | **Done — verified in browser** |
+| Evidence retrieval (RSS, GDELT, hybrid search) | Not started |
+| Evidence extraction and classification | Not started |
+| Image / video / social pipelines | Not started |
 
-**210 tests pass** (`pytest`, offline, no Docker required). There is no running
-server and no UI yet — the commands below reflect that.
+**321 unit + 4 integration tests pass.** The end-to-end path works today:
+submit → API → PostgreSQL → Redis → worker → persisted stages → report page.
+
+Because retrieval is not built yet, every verification honestly returns
+`UNVERIFIED` and says so: no sources are searched, so no evidence exists. The
+report states plainly that this does not mean the claim is false. No fixture
+data is ever presented as real evidence.
+
+
+
 
 ---
 
@@ -179,9 +190,27 @@ Test markers keep the core suite trustworthy offline: `integration` (needs
 services), `live` (needs internet), `slow`, `heavy` (needs ML extras). A bare
 `pytest` run excludes all four.
 
-Commands for the server, worker, migrations, RSS ingestion, and frontend will be
-added here as those pieces land — they are not listed yet because they do not
-exist yet.
+```bash
+# Backend services (from repo root)
+docker compose up -d                      # Postgres :55432, Redis :56379, MinIO :59000
+
+# Migrations (from backend/)
+.venv/Scripts/python -m alembic upgrade head
+
+# API server (from backend/) - use run_api.py, not `uvicorn` directly:
+# psycopg's async driver cannot use Windows' default ProactorEventLoop.
+.venv/Scripts/python run_api.py --port 8123
+
+# Verification worker (from backend/)
+.venv/Scripts/python -m app.workers.worker
+
+# Frontend (from apps/web/)
+pnpm dev --port 3100
+pnpm build / pnpm typecheck / pnpm lint
+```
+
+Ports are deliberately non-default: this machine already runs other stacks on
+5432, 6379, 9000, and 8000.
 
 ---
 

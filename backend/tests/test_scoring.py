@@ -512,6 +512,62 @@ class TestBreakdownExplainability:
         json.dumps(overall.to_breakdown())
 
 
+class TestSingleGoodSource:
+    """One directly-relevant passage from the reporting publisher is evidence.
+
+    Regression guard for the 1.1.0 threshold change: before it, a claim could be
+    confirmed verbatim by the outlet that reported it and still return
+    UNVERIFIED, because total weight fell under MIN_EVIDENCE_WEIGHT.
+    """
+
+    def test_one_strong_source_is_not_unverified(self) -> None:
+        result = score_claim(
+            ClaimSignals(
+                claim_id="c1",
+                evidence=supporting(
+                    1, cluster="a", relevance=0.64, source_type=SourceType.NEWS_ORGANIZATION
+                ),
+            )
+        )
+        assert result.verdict is not Verdict.UNVERIFIED
+        assert result.verdict is Verdict.LIKELY_TRUE
+
+    def test_one_source_still_cannot_reach_verified(self) -> None:
+        """Lowering the floor must not weaken the strongest verdict."""
+        result = score_claim(
+            ClaimSignals(
+                claim_id="c1",
+                evidence=supporting(
+                    1, cluster="a", relevance=1.0, source_type=SourceType.OFFICIAL_GOVERNMENT
+                ),
+            )
+        )
+        assert result.verdict is not Verdict.VERIFIED
+
+    def test_one_source_still_cannot_reach_false(self) -> None:
+        result = score_claim(
+            ClaimSignals(
+                claim_id="c1",
+                evidence=contradicting(
+                    1, cluster="a", relevance=1.0, source_type=SourceType.OFFICIAL_GOVERNMENT
+                ),
+            )
+        )
+        assert result.verdict is not Verdict.FALSE
+
+    def test_trivial_evidence_is_still_unverified(self) -> None:
+        """The floor still has to reject noise."""
+        result = score_claim(
+            ClaimSignals(
+                claim_id="c1",
+                evidence=supporting(
+                    1, cluster="a", relevance=0.2, source_type=SourceType.UNKNOWN
+                ),
+            )
+        )
+        assert result.verdict is Verdict.UNVERIFIED
+
+
 class TestRegressionFixtures:
     """Named misinformation patterns from docs/PRODUCT.md."""
 

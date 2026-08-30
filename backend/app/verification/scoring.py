@@ -77,7 +77,18 @@ CLUSTER_DAMPING = 0.15
 TARGET_ORIGINS = 3
 
 #: Below this total weight there is not enough evidence to say anything.
-MIN_EVIDENCE_WEIGHT = 0.8
+#:
+#: Lowered from 0.8 in 1.1.0. The original figure was set before evidence
+#: classification worked well, when most passages were undifferentiated NEUTRAL
+#: noise and a high bar was the only defence against acting on it. With accurate
+#: classification, one directly-relevant passage from the publisher that
+#: reported the story is real evidence, and 0.8 was discarding it -- a claim
+#: could be confirmed verbatim by its own source and still return UNVERIFIED.
+#:
+#: This does not weaken the strong verdicts: VERIFIED and FALSE still require
+#: multiple independent origins and much greater mass (see the constants below).
+#: It only lets a single good source produce LIKELY_TRUE instead of nothing.
+MIN_EVIDENCE_WEIGHT = 0.45
 
 #: Thresholds for the claim verdict decision table.
 NET_VERIFIED = 0.75

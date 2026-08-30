@@ -13,7 +13,7 @@ from typing import Final
 PIPELINE_VERSION: Final[str] = "1.0.0"
 
 #: Deterministic scoring formula. Documented in docs/SCORING.md.
-SCORING_VERSION: Final[str] = "1.0.0"
+SCORING_VERSION: Final[str] = "1.1.0"
 
 #: Retrieval strategy: providers, hybrid merge, ranking, clustering.
 RETRIEVAL_VERSION: Final[str] = "1.0.0"

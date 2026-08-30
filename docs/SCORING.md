@@ -1,6 +1,6 @@
 # Scoring
 
-`SCORING_VERSION = "1.0.0"`
+`SCORING_VERSION = "1.1.0"`
 
 Implemented in `backend/app/verification/scoring.py`. The function is **pure**:
 signals in, verdict out. No I/O, no model calls, no clock reads (the evaluation
@@ -109,7 +109,7 @@ net = (S - C) / max(S + C, 1e-9)      # ∈ [-1, 1]
 
 Decision order (first match wins):
 
-1. `S + C < MIN_EVIDENCE (0.8)` or `O == 0`      -> **UNVERIFIED**
+1. `S + C < MIN_EVIDENCE (0.45)` or `O == 0`     -> **UNVERIFIED**
 2. Claim type is `OPINION`/prediction              -> **OPINION**
 3. Source context flagged satirical                -> **SATIRE**
 4. `net >= 0.6` and `P >= 0.35`                    -> **MISLEADING**

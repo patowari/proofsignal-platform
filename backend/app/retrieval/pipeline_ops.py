@@ -24,6 +24,7 @@ from app.retrieval.article import fetch_article
 from app.retrieval.base import RetrievedItem
 from app.retrieval.evidence import ExtractedEvidence, extract_evidence_for_claim
 from app.retrieval.feeds import RSSFeedProvider, is_primary_source_domain
+from app.retrieval.site_search import SiteSearchProvider
 
 logger = get_logger(__name__)
 
@@ -109,7 +110,9 @@ def retrieve_candidates(
     queries: list[str], *, language: str, limit: int
 ) -> tuple[list[RetrievedItem], list[str]]:
     """Query all available providers. Returns (items, errors)."""
-    providers = [RSSFeedProvider()]
+    # Feeds cover breaking news; site search covers the archive and the
+    # section pages feeds omit. Both are needed.
+    providers = [RSSFeedProvider(), SiteSearchProvider()]
     items: list[RetrievedItem] = []
     errors: list[str] = []
 
@@ -291,8 +294,20 @@ def build_evidence_for_claim(
         session, verification_id, [document for document, _, _ in documents]
     )
 
+    # Prefer an LLM classifier when one is configured. Lexical rules cannot tell
+    # that two Bangla sentences state the same fact in different words, which is
+    # exactly the case that matters here. Selected once per claim, not per
+    # passage, so an unavailable provider is not probed repeatedly.
+    from app.ai.llm import get_llm_provider
+
+    llm = get_llm_provider()
+
     for document, body, _item in documents:
         passages = extract_evidence_for_claim(claim_text, body, queries, language=language)
+
+        if llm is not None and passages:
+            passages = _reclassify_with_llm(llm, claim_text, passages, language)
+
         for passage in passages:
             # Neutral passages are recorded so the report can show what was
             # checked, but they add no weight to the verdict.

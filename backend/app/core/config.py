@@ -164,6 +164,12 @@ class Settings(BaseSettings):
     #: Per-feed fetch timeout. Kept short: a slow publisher must not hold up a
     #: verification, and feeds are fetched concurrently anyway.
     rss_feed_timeout_seconds: float = 8.0
+    #: Search publishers' own archives as well as their feeds. RSS carries only
+    #: the newest 20-60 items and often omits section stories entirely, so feeds
+    #: alone miss articles that are plainly live on the site.
+    site_search_enabled: bool = True
+    site_search_timeout_seconds: float = 12.0
+    site_search_max_sites: int = 5
     #: Cap on feeds queried per verification, bounding worst-case latency.
     rss_max_feeds_per_query: int = 20
     #: Minimum retrieval score for a candidate to become evidence. Tuned against

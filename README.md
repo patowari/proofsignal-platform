@@ -18,18 +18,18 @@ through, and when the evidence is insufficient the honest answer is `UNVERIFIED`
 
 V1 is **in progress**. This table is the honest state of the build, not a plan.
 
-| Area | Status |
-|---|---|
-| Documentation, project rules | ✅ Done |
-| SSRF-safe fetch layer | ✅ Done — 131 tests |
-| Prompt-injection isolation | ✅ Done — 35 tests |
-| Domain models (15 tables) | ✅ Done |
-| Deterministic scoring engine | ✅ Done — 44 tests |
-| FastAPI app, API endpoints | ⬜ Not started |
-| Job queue and worker | ⬜ Not started |
-| Claim extraction, retrieval, evidence analysis | ⬜ Not started |
-| **Frontend (composer, progress, report page)** | ⬜ **Not started** |
-| Image / video / social pipelines | ⬜ Not started |
+| Area                                                 | Status                  |
+| ---------------------------------------------------- | ----------------------- |
+| Documentation, project rules                         | ✅ Done                 |
+| SSRF-safe fetch layer                                | ✅ Done — 131 tests    |
+| Prompt-injection isolation                           | ✅ Done — 35 tests     |
+| Domain models (15 tables)                            | ✅ Done                 |
+| Deterministic scoring engine                         | ✅ Done — 44 tests     |
+| FastAPI app, API endpoints                           | ⬜ Not started          |
+| Job queue and worker                                 | ⬜ Not started          |
+| Claim extraction, retrieval, evidence analysis       | ⬜ Not started          |
+| **Frontend (composer, progress, report page)** | ⬜**Not started** |
+| Image / video / social pipelines                     | ⬜ Not started          |
 
 **210 tests pass** (`pytest`, offline, no Docker required). There is no running
 server and no UI yet — the commands below reflect that.
@@ -95,15 +95,15 @@ infrastructure/    compose configs, feed configuration
 
 ## Requirements
 
-| Tool | Version | Required? |
-|---|---|---|
-| Python | **3.12** | Yes — not 3.13, whose ctranslate2/faster-whisper wheels lag |
-| Node | 20+ | For the frontend (once it exists) |
-| pnpm | 9+ | Frontend package manager |
-| Docker + Compose | recent | For PostgreSQL, Redis, MinIO |
-| FFmpeg + ffprobe | 6+ | Video processing |
-| Ollama | latest | Optional — claim extraction degrades without it |
-| Tesseract | 5+ | Optional — OCR degrades without it |
+| Tool             | Version        | Required?                                                    |
+| ---------------- | -------------- | ------------------------------------------------------------ |
+| Python           | **3.12** | Yes — not 3.13, whose ctranslate2/faster-whisper wheels lag |
+| Node             | 20+            | For the frontend (once it exists)                            |
+| pnpm             | 9+             | Frontend package manager                                     |
+| Docker + Compose | recent         | For PostgreSQL, Redis, MinIO                                 |
+| FFmpeg + ffprobe | 6+             | Video processing                                             |
+| Ollama           | latest         | Optional — claim extraction degrades without it             |
+| Tesseract        | 5+             | Optional — OCR degrades without it                          |
 
 **Everything optional genuinely is optional.** The app boots, serves, and passes
 its full default test suite with no Ollama, no Tesseract, no ML extras, no
@@ -187,8 +187,7 @@ exist yet.
 
 ## Verdicts
 
-`VERIFIED · LIKELY_TRUE · PARTLY_TRUE · MISLEADING · UNVERIFIED · LIKELY_FALSE ·
-FALSE · SATIRE · OPINION`
+`VERIFIED · LIKELY_TRUE · PARTLY_TRUE · MISLEADING · UNVERIFIED · LIKELY_FALSE · FALSE · SATIRE · OPINION`
 
 The cases that are easy to get wrong, and that the test suite pins down:
 
@@ -207,7 +206,7 @@ The cases that are easy to get wrong, and that the test suite pins down:
   reported as a failure, never converted into `FALSE`.
 
 Confidence is shown as `LOW / MEDIUM / HIGH`. There is no percentage anywhere in
-the UI — the numeric score exists only for debugging and future calibration.
+the UI, the numeric score exists only for debugging and future calibration.
 Formula: [docs/SCORING.md](docs/SCORING.md).
 
 ---
@@ -263,18 +262,18 @@ protections, the fix is a narrowly-scoped fixture — never a global bypass.
 
 ## Documentation
 
-| Doc | Contents |
-|---|---|
-| [PRODUCT.md](docs/PRODUCT.md) | What this is, verdict taxonomy, limitations |
-| [ARCHITECTURE.md](docs/ARCHITECTURE.md) | Components, seams, degradation matrix |
-| [DATABASE.md](docs/DATABASE.md) | Model map and table reference |
-| [VERIFICATION_PIPELINE.md](docs/VERIFICATION_PIPELINE.md) | Stage machine, failure handling |
-| [RETRIEVAL.md](docs/RETRIEVAL.md) | Providers, hybrid search, independence clustering |
-| [MEDIA_PIPELINE.md](docs/MEDIA_PIPELINE.md) | Image, screenshot, video processing |
-| [SCORING.md](docs/SCORING.md) | The deterministic formula, versioned |
-| [SECURITY.md](docs/SECURITY.md) | Threat model and controls |
-| [API.md](docs/API.md) | Endpoints and conventions |
-| [ROADMAP.md](docs/ROADMAP.md) | Phases, limitations, what comes after V1 |
+| Doc                                                      | Contents                                          |
+| -------------------------------------------------------- | ------------------------------------------------- |
+| [PRODUCT.md](docs/PRODUCT.md)                             | What this is, verdict taxonomy, limitations       |
+| [ARCHITECTURE.md](docs/ARCHITECTURE.md)                   | Components, seams, degradation matrix             |
+| [DATABASE.md](docs/DATABASE.md)                           | Model map and table reference                     |
+| [VERIFICATION_PIPELINE.md](docs/VERIFICATION_PIPELINE.md) | Stage machine, failure handling                   |
+| [RETRIEVAL.md](docs/RETRIEVAL.md)                         | Providers, hybrid search, independence clustering |
+| [MEDIA_PIPELINE.md](docs/MEDIA_PIPELINE.md)               | Image, screenshot, video processing               |
+| [SCORING.md](docs/SCORING.md)                             | The deterministic formula, versioned              |
+| [SECURITY.md](docs/SECURITY.md)                           | Threat model and controls                         |
+| [API.md](docs/API.md)                                     | Endpoints and conventions                         |
+| [ROADMAP.md](docs/ROADMAP.md)                             | Phases, limitations, what comes after V1          |
 
 [CLAUDE.md](CLAUDE.md) holds permanent project instructions;
 [.claude/rules/](.claude/rules/) holds detailed per-area rules.

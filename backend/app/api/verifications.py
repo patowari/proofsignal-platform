@@ -119,6 +119,11 @@ async def _claim_responses(
         supporting = contradicting = 0
         clusters: set[int] = set()
 
+        # An item with no cluster is its own origin; only clustered items share
+        # one. Counting clusters alone reported zero origins whenever every
+        # source was independent, which is the common case.
+        standalone_origins: set[int] = set()
+
         for ev in claim.evidence:
             if ev.relationship_type is EvidenceRelationship.SUPPORTS:
                 supporting += 1
@@ -126,6 +131,8 @@ async def _claim_responses(
                 contradicting += 1
             if ev.cluster_id is not None:
                 clusters.add(ev.cluster_id)
+            elif ev.document_id is not None:
+                standalone_origins.add(ev.document_id)
 
             if include_evidence:
                 doc = ev.document
@@ -157,7 +164,7 @@ async def _claim_responses(
                 contradicting_count=contradicting,
                 # Distinct origins, not raw counts: syndicated copies must never
                 # be presented as independent corroboration.
-                independent_origins=len(clusters) if clusters else 0,
+                independent_origins=len(clusters) + len(standalone_origins),
             )
         )
     return responses

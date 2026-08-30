@@ -74,6 +74,11 @@ ignore = ["E501", "B008", "S101"]
 # those characters ARE the attack under test.
 "tests/test_untrusted.py" = ["S", "N806", "RUF001", "RUF003"]
 "tests/test_url_validation.py" = ["S", "N806", "RUF001", "RUF003"]
+# Bangla text and typographic punctuation are the subject matter here, not a
+# typo: the dashes and Bengali markers must stay exactly as written.
+"app/retrieval/evidence.py" = ["RUF001", "RUF003"]
+"app/retrieval/scoring.py" = ["RUF001", "RUF003"]
+"app/verification/claim_extraction.py" = ["RUF001", "RUF003"]
 "alembic/*" = ["N999", "F401"]
 # Entrypoints must set the asyncio loop policy before importing anything that
 # creates a loop or a database connection, so imports cannot come first.

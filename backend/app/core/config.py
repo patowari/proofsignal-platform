@@ -28,9 +28,20 @@ class Settings(BaseSettings):
     environment: Literal["development", "test", "production"] = "development"
     debug: bool = False
     api_prefix: str = "/api"
-    frontend_url: str = "http://localhost:3000"
-    api_url: str = "http://localhost:8000"
-    cors_origins: list[str] = Field(default_factory=lambda: ["http://localhost:3000"])
+    frontend_url: str = "http://localhost:3100"
+    api_url: str = "http://localhost:8123"
+    #: Allowed browser origins. localhost and 127.0.0.1 are distinct origins to
+    #: a browser even though they resolve to the same host, so both forms of
+    #: each dev port are listed -- otherwise the frontend works at one and is
+    #: blocked at the other. Production sets this explicitly via env.
+    cors_origins: list[str] = Field(
+        default_factory=lambda: [
+            "http://localhost:3100",
+            "http://127.0.0.1:3100",
+            "http://localhost:3000",
+            "http://127.0.0.1:3000",
+        ]
+    )
     log_level: str = "INFO"
     log_format: Literal["json", "console"] = "console"
 
@@ -125,6 +136,17 @@ class Settings(BaseSettings):
     feeds_config_path: str = "../infrastructure/feeds.yaml"
     rss_ingest_interval_seconds: int = 900
     retrieval_candidate_limit: int = 40
+    #: Per-feed fetch timeout. Kept short: a slow publisher must not hold up a
+    #: verification, and feeds are fetched concurrently anyway.
+    rss_feed_timeout_seconds: float = 8.0
+    #: Cap on feeds queried per verification, bounding worst-case latency.
+    rss_max_feeds_per_query: int = 20
+    #: Minimum retrieval score for a candidate to become evidence. Below this a
+    #: match is coincidental word overlap, not relevance.
+    retrieval_min_score: float = 0.18
+    #: Article bodies fetched per verification. Each is a full HTTP round trip
+    #: through the SSRF-safe fetcher, so this bounds latency directly.
+    max_article_fetches: int = 6
 
     @field_validator("cors_origins", "allowed_url_ports", mode="before")
     @classmethod
@@ -135,6 +157,25 @@ class Settings(BaseSettings):
             if stripped.startswith("["):
                 return value
             return [item.strip() for item in stripped.split(",") if item.strip()]
+        return value
+
+    @field_validator("debug", mode="before")
+    @classmethod
+    def _parse_debug_mode(cls, value: object) -> object:
+        """Tolerate common host-level DEBUG modes that are not booleans.
+
+        Windows developer tools sometimes export ``DEBUG=release`` globally.
+        Environment variables override the project's ``.env``, so treating a
+        release/production mode as false prevents an unrelated host setting
+        from stopping the API and worker at startup.
+        """
+        if isinstance(value, str) and value.strip().lower() in {
+            "release",
+            "production",
+            "prod",
+            "off",
+        }:
+            return False
         return value
 
     @property

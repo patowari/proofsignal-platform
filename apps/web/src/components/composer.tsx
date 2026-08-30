@@ -6,7 +6,7 @@
  * One control, four entry methods. No account required, and the UI says so.
  */
 
-import { FileVideo, Image as ImageIcon, Link2, Loader2, Type, Upload, X } from "lucide-react";
+import { ArrowRight, FileVideo, Image as ImageIcon, Link2, Loader2, ShieldCheck, Type, Upload, X } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useRef, useState } from "react";
 import {
@@ -52,6 +52,9 @@ export function Composer() {
 
   const isMedia = mode === "image" || mode === "video";
   const maxBytes = mode === "video" ? MAX_VIDEO_BYTES : MAX_IMAGE_BYTES;
+  const isReady = isMedia
+    ? Boolean(file) && caption.trim().length >= 10
+    : text.trim().length >= 10;
 
   function switchMode(next: Mode) {
     setMode(next);
@@ -83,6 +86,12 @@ export function Composer() {
       setError(`Choose ${mode === "video" ? "a video" : "an image"} to verify.`);
       return;
     }
+    if (isMedia && caption.trim().length < 10) {
+      setError(
+        "Add a short caption describing the factual claim in this file (at least 10 characters).",
+      );
+      return;
+    }
     if (!isMedia && text.trim().length < 10) {
       setError(
         mode === "url"
@@ -100,8 +109,8 @@ export function Composer() {
           : mode === "url"
             ? await submitUrl(text.trim())
             : mode === "image"
-              ? await submitImage(file!, caption || undefined, isScreenshot)
-              : await submitVideo(file!, caption || undefined);
+              ? await submitImage(file!, caption.trim(), isScreenshot)
+              : await submitVideo(file!, caption.trim());
 
       router.push(`/verify/${result.verification_public_id}`);
     } catch (caught) {
@@ -122,12 +131,12 @@ export function Composer() {
 
   return (
     <form onSubmit={handleSubmit} className="w-full">
-      <div className="rounded-lg border border-rule bg-surface shadow-sm">
+      <div className="composer-shell overflow-hidden rounded-xl border border-rule bg-surface">
         {/* Mode selector */}
         <div
           role="tablist"
           aria-label="What do you want to verify?"
-          className="flex border-b border-rule"
+          className="grid grid-cols-4 border-b border-rule"
         >
           {MODES.map(({ id, label, icon: Icon }) => (
             <button
@@ -138,9 +147,9 @@ export function Composer() {
               aria-controls="composer-panel"
               onClick={() => switchMode(id)}
               className={cn(
-                "flex flex-1 items-center justify-center gap-2 px-3 py-3 text-sm font-medium transition-colors sm:flex-none sm:px-5",
+                "flex min-h-12 items-center justify-center gap-1.5 px-2 py-3 text-xs font-semibold transition-colors sm:gap-2 sm:px-5 sm:text-sm",
                 mode === id
-                  ? "border-b-2 border-current -mb-px"
+                  ? "-mb-px border-b-2 border-[var(--red)] bg-[var(--red-soft)] text-[var(--red)]"
                   : "text-muted hover:text-current",
               )}
             >
@@ -153,7 +162,7 @@ export function Composer() {
         <div id="composer-panel" role="tabpanel" className="p-4 sm:p-5">
           {!isMedia ? (
             <>
-              <label htmlFor="composer-input" className="sr-only">
+              <label htmlFor="composer-input" className="mb-2 block text-sm font-semibold">
                 {mode === "url" ? "Link to verify" : "Text to verify"}
               </label>
               {mode === "url" ? (
@@ -163,7 +172,7 @@ export function Composer() {
                   value={text}
                   onChange={(e) => setText(e.target.value)}
                   placeholder={PLACEHOLDERS[mode]}
-                  className="w-full bg-transparent text-base outline-none placeholder:text-muted"
+                  className="min-h-12 w-full rounded-lg border border-rule bg-white px-4 text-base outline-none transition-colors placeholder:text-muted focus:border-[var(--green)]"
                   autoComplete="url"
                   spellCheck={false}
                 />
@@ -175,9 +184,13 @@ export function Composer() {
                   placeholder={PLACEHOLDERS[mode]}
                   rows={5}
                   maxLength={50_000}
-                  className="w-full resize-y bg-transparent text-base leading-relaxed outline-none placeholder:text-muted"
+                  className="min-h-36 w-full resize-y rounded-lg border border-rule bg-white p-4 text-base leading-relaxed outline-none transition-colors placeholder:text-muted focus:border-[var(--green)]"
                 />
               )}
+              <div className="mt-2 flex items-center justify-between gap-3 text-xs text-muted">
+                <span>{mode === "url" ? "Paste the complete public URL." : "Bangla and English are supported."}</span>
+                {mode === "text" ? <span className="tabular-nums">{text.length.toLocaleString()} / 50,000</span> : null}
+              </div>
             </>
           ) : (
             <MediaPicker
@@ -195,15 +208,16 @@ export function Composer() {
         </div>
 
         <div className="flex flex-wrap items-center justify-between gap-3 border-t border-rule px-4 py-3 sm:px-5">
-          <p className="text-xs text-muted">
+          <p className="flex items-center gap-1.5 text-xs text-muted">
+            <ShieldCheck className="h-3.5 w-3.5 text-[var(--green)]" aria-hidden="true" />
             {mode === "text" || mode === "url"
               ? "No account needed. Results are public."
               : `Up to ${formatBytes(maxBytes)}. Results are public.`}
           </p>
           <button
             type="submit"
-            disabled={submitting}
-            className="inline-flex items-center gap-2 rounded-md bg-[var(--foreground)] px-5 py-2 text-sm font-medium text-[var(--background)] transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
+            disabled={submitting || !isReady}
+            className="verify-button inline-flex items-center gap-2 rounded-md px-6 py-2.5 text-sm font-semibold text-white transition-all disabled:cursor-not-allowed disabled:opacity-50"
           >
             {submitting ? (
               <>
@@ -211,7 +225,7 @@ export function Composer() {
                 Submitting…
               </>
             ) : (
-              "Verify"
+              <><span>Check this claim</span><ArrowRight className="h-4 w-4" aria-hidden="true" /></>
             )}
           </button>
         </div>
@@ -220,6 +234,7 @@ export function Composer() {
       {error ? (
         <p
           role="alert"
+          aria-live="polite"
           className="mt-3 rounded-md border border-red-300 bg-red-50 px-4 py-3 text-sm text-red-900 dark:border-red-900 dark:bg-red-950/50 dark:text-red-100"
         >
           {error}
@@ -276,7 +291,7 @@ function MediaPicker({
         <button
           type="button"
           onClick={() => inputRef.current?.click()}
-          className="flex w-full flex-col items-center gap-2 rounded-md border border-dashed border-rule px-4 py-8 text-center transition-colors hover:border-current"
+          className="flex w-full flex-col items-center gap-2 rounded-lg border-2 border-dashed border-rule bg-[var(--green-soft)]/40 px-4 py-9 text-center transition-colors hover:border-[var(--green)] hover:bg-[var(--green-soft)]"
         >
           <Upload className="h-6 w-6 text-muted" aria-hidden="true" />
           <span className="text-sm font-medium">
@@ -301,21 +316,23 @@ function MediaPicker({
 
       <div>
         <label htmlFor="composer-caption" className="text-sm font-medium">
-          Caption or context{" "}
-          <span className="font-normal text-muted">(optional)</span>
+          Claim shown in this file{" "}
+          <span className="font-normal text-[var(--red)]">(required)</span>
         </label>
         {/* The caption is verified as its own claim: an authentic file can carry
             a false caption, and the report keeps those separate. */}
         <p className="mt-0.5 text-xs text-muted">
-          What is this said to show? We check the caption separately from the
-          file itself.
+          Describe what this is said to show. This gives the checker a factual
+          claim it can assess immediately.
         </p>
         <input
           id="composer-caption"
           type="text"
           value={caption}
           onChange={(e) => onCaption(e.target.value)}
-          placeholder="e.g. Flooding in Dhaka this week"
+          placeholder="e.g. This shows flooding in Dhaka this week"
+          required
+          minLength={10}
           maxLength={2000}
           className="mt-2 w-full rounded-md border border-rule bg-transparent px-3 py-2 text-sm outline-none focus:border-current"
         />

@@ -221,13 +221,12 @@ pnpm build
 
 ```powershell
 # What has been submitted and what came of it
-docker exec verifier-postgres psql -U verifier -d verifier -c "SELECT public_id, status, overall_verdict, current_stage FROM verifications ORDER BY id DESC LIMIT 10;"
+docker exec verifier-postgres psql -U verifier -d verifier \
+  -c "SELECT public_id, status, overall_verdict, current_stage FROM verifications ORDER BY id DESC LIMIT 10;"
 
-# Real stage transitions, newest verification first
-docker exec verifier-postgres psql -U verifier -d verifier -c "SELECT sequence, stage, status, duration_ms FROM verification_stages ORDER BY id DESC LIMIT 12;"
-
-# Claims extracted from the most recent submission
-docker exec verifier-postgres psql -U verifier -d verifier -c "SELECT claim_type, verdict, importance, left(claim_text, 60) FROM claims ORDER BY id DESC LIMIT 5;"
+# Real stage transitions for one verification
+docker exec verifier-postgres psql -U verifier -d verifier \
+  -c "SELECT sequence, stage, status, duration_ms FROM verification_stages ORDER BY id DESC LIMIT 12;"
 
 # Queue depth and dead-lettered jobs
 docker exec verifier-redis redis-cli LLEN queue:verification:pending

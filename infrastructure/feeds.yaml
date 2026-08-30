@@ -1,0 +1,249 @@
+# News sources for evidence retrieval.
+#
+# Configuration, not code: adding a source must never require a code change.
+#
+# IMPORTANT: being listed here does NOT make a source trusted. `source_type`
+# is one weighted feature among many in scoring, and no domain is ever treated
+# as a truth oracle. A claim supported only by sources in this file is still
+# only as strong as the specific passages found. See docs/RETRIEVAL.md.
+#
+# Fields:
+#   name        Display name shown in reports
+#   url         RSS/Atom feed URL
+#   domain      Canonical domain, used for source identity and deduplication
+#   language    ISO code (bn, en)
+#   country     ISO code
+#   category    general | business | technology | sports | world
+#   source_type Maps to app.core.enums.SourceType
+#   enabled     Set false to skip without deleting the entry
+#
+# Feed URLs were verified live. Entries marked `enabled: false` carry the reason
+# they were disabled -- kept rather than deleted so the finding is recorded and
+# they can be re-enabled if the publisher restores the feed.
+
+feeds:
+  # ---- Bangladesh, Bangla ------------------------------------------------
+  - name: Prothom Alo
+    url: https://www.prothomalo.com/feed
+    domain: prothomalo.com
+    language: bn
+    country: BD
+    category: general
+    source_type: NEWS_ORGANIZATION
+    enabled: true
+
+  - name: Samakal
+    url: https://samakal.com/rss
+    domain: samakal.com
+    language: bn
+    country: BD
+    category: general
+    source_type: NEWS_ORGANIZATION
+    enabled: true
+
+  - name: RTV Online
+    url: https://www.rtvonline.com/rss/rss.xml
+    domain: rtvonline.com
+    language: bn
+    country: BD
+    category: general
+    source_type: NEWS_ORGANIZATION
+    enabled: true
+
+  - name: Jugantor
+    url: https://www.jugantor.com/feed/rss.xml
+    domain: jugantor.com
+    language: bn
+    country: BD
+    category: general
+    source_type: NEWS_ORGANIZATION
+    enabled: false  # 403: blocks automated readers
+
+  - name: Kaler Kantho
+    url: https://www.kalerkantho.com/rss.xml
+    domain: kalerkantho.com
+    language: bn
+    country: BD
+    category: general
+    source_type: NEWS_ORGANIZATION
+    enabled: false  # 403: blocks automated readers
+
+  - name: Ittefaq
+    url: https://www.ittefaq.com.bd/feed
+    domain: ittefaq.com.bd
+    language: bn
+    country: BD
+    category: general
+    source_type: NEWS_ORGANIZATION
+    enabled: false  # 404: no working feed path found
+
+  - name: Bangla Tribune
+    url: https://www.banglatribune.com/feed/rss
+    domain: banglatribune.com
+    language: bn
+    country: BD
+    category: general
+    source_type: NEWS_ORGANIZATION
+    enabled: true
+
+  - name: Jagonews24
+    url: https://www.jagonews24.com/rss/rss.xml
+    domain: jagonews24.com
+    language: bn
+    country: BD
+    category: general
+    source_type: NEWS_ORGANIZATION
+    enabled: true
+
+  # ---- Bangladesh, English -----------------------------------------------
+  - name: The Daily Star
+    url: https://www.thedailystar.net/rss.xml
+    domain: thedailystar.net
+    language: en
+    country: BD
+    category: general
+    source_type: NEWS_ORGANIZATION
+    enabled: true
+
+  - name: Dhaka Tribune
+    url: https://www.dhakatribune.com/feed/rss
+    domain: dhakatribune.com
+    language: en
+    country: BD
+    category: general
+    source_type: NEWS_ORGANIZATION
+    enabled: true
+
+  - name: New Age
+    url: https://www.newagebd.net/feed
+    domain: newagebd.net
+    language: en
+    country: BD
+    category: general
+    source_type: NEWS_ORGANIZATION
+    enabled: false  # 404: no working feed path found
+
+  - name: The Business Standard
+    url: https://www.tbsnews.net/rss.xml
+    domain: tbsnews.net
+    language: en
+    country: BD
+    category: business
+    source_type: NEWS_ORGANIZATION
+    enabled: true
+
+  - name: BSS (Bangladesh Sangbad Sangstha)
+    url: https://www.bssnews.net/rss.xml
+    domain: bssnews.net
+    language: en
+    country: BD
+    category: general
+    # State news agency: a primary source for official announcements
+    # specifically, which is what NEWS_AGENCY weighting reflects.
+    source_type: NEWS_AGENCY
+    enabled: false  # feed returns no items
+
+  # ---- International wire services ---------------------------------------
+  # Included because misinformation often circulates in Bangla while the
+  # underlying reporting is in English, and vice versa.
+  - name: BBC News
+    url: https://feeds.bbci.co.uk/news/world/rss.xml
+    domain: bbc.com
+    language: en
+    country: GB
+    category: world
+    source_type: NEWS_ORGANIZATION
+    enabled: true
+
+  - name: BBC Bangla
+    url: https://feeds.bbci.co.uk/bengali/rss.xml
+    domain: bbc.com
+    language: bn
+    country: GB
+    category: world
+    source_type: NEWS_ORGANIZATION
+    enabled: true
+
+  - name: Reuters World
+    url: https://www.reutersagency.com/feed/?best-topics=world&post_type=best
+    domain: reuters.com
+    language: en
+    country: GB
+    category: world
+    source_type: NEWS_AGENCY
+    enabled: false  # 404: feed retired
+
+  - name: Al Jazeera
+    url: https://www.aljazeera.com/xml/rss/all.xml
+    domain: aljazeera.com
+    language: en
+    country: QA
+    category: world
+    source_type: NEWS_ORGANIZATION
+    enabled: true
+
+  - name: The Guardian World
+    url: https://www.theguardian.com/world/rss
+    domain: theguardian.com
+    language: en
+    country: GB
+    category: world
+    source_type: NEWS_ORGANIZATION
+    enabled: true
+
+# Primary-source registry.
+#
+# Certain claim types have a natural authority. Matching a claim to one raises
+# that evidence's weight for that claim only -- it does not make the domain
+# trustworthy in general. See docs/SCORING.md on PRIMARY_SOURCE_BONUS.
+primary_sources:
+  earthquake:
+    - domain: usgs.gov
+      name: United States Geological Survey
+      source_type: SCIENTIFIC_SOURCE
+    - domain: emsc-csem.org
+      name: European-Mediterranean Seismological Centre
+      source_type: SCIENTIFIC_SOURCE
+
+  weather:
+    - domain: bmd.gov.bd
+      name: Bangladesh Meteorological Department
+      source_type: OFFICIAL_GOVERNMENT
+
+  government_bd:
+    - domain: bangladesh.gov.bd
+      name: Government of Bangladesh
+      source_type: OFFICIAL_GOVERNMENT
+    - domain: pmo.gov.bd
+      name: Prime Minister's Office
+      source_type: OFFICIAL_GOVERNMENT
+    - domain: mopa.gov.bd
+      name: Ministry of Public Administration
+      source_type: OFFICIAL_GOVERNMENT
+
+  education_bd:
+    - domain: dshe.gov.bd
+      name: Directorate of Secondary and Higher Education
+      source_type: OFFICIAL_GOVERNMENT
+    - domain: moedu.gov.bd
+      name: Ministry of Education
+      source_type: OFFICIAL_GOVERNMENT
+    - domain: educationboard.gov.bd
+      name: Bangladesh Education Board
+      source_type: OFFICIAL_GOVERNMENT
+
+  health:
+    - domain: who.int
+      name: World Health Organization
+      source_type: SCIENTIFIC_SOURCE
+    - domain: dghs.gov.bd
+      name: Directorate General of Health Services
+      source_type: OFFICIAL_GOVERNMENT
+
+  economy_bd:
+    - domain: bb.org.bd
+      name: Bangladesh Bank
+      source_type: OFFICIAL_GOVERNMENT
+    - domain: bbs.gov.bd
+      name: Bangladesh Bureau of Statistics
+      source_type: OFFICIAL_GOVERNMENT

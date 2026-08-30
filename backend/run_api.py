@@ -20,6 +20,7 @@ from __future__ import annotations
 
 import argparse
 import asyncio
+import subprocess
 import sys
 
 
@@ -29,7 +30,20 @@ def main() -> None:
     parser.add_argument("--port", type=int, default=8123)
     parser.add_argument("--reload", action="store_true")
     parser.add_argument("--log-level", default="info")
+    parser.add_argument(
+        "--no-worker",
+        action="store_true",
+        help="Do not start the local verification worker alongside the API.",
+    )
     args = parser.parse_args()
+
+    # A submission only places work on Redis; without a worker it remains
+    # QUEUED forever. Local development should work from one command, so the
+    # API owns a worker by default. Deployments run the worker independently
+    # and can opt out with --no-worker.
+    worker: subprocess.Popen[bytes] | None = None
+    if not args.no_worker and not args.reload:
+        worker = subprocess.Popen([sys.executable, "-m", "app.workers.worker"])
 
     import uvicorn
 
@@ -41,21 +55,28 @@ def main() -> None:
         log_level=args.log_level,
     )
 
-    if sys.platform == "win32" and not args.reload:
-        # Own the loop so psycopg gets a Selector-based one. Incompatible with
-        # --reload, which needs to supervise a subprocess; use --reload only for
-        # frontend-facing iteration where the database is not exercised, or run
-        # without it.
-        asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
-        loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(loop)
-        server = uvicorn.Server(config)
-        try:
+    try:
+        if sys.platform == "win32" and not args.reload:
+            # Own the loop so psycopg gets a Selector-based one. Incompatible with
+            # --reload, which needs to supervise a subprocess; use --reload only for
+            # frontend-facing iteration where the database is not exercised, or run
+            # without it.
+            asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+            server = uvicorn.Server(config)
             loop.run_until_complete(server.serve())
-        finally:
             loop.close()
-    else:
-        uvicorn.Server(config).run()
+        else:
+            uvicorn.Server(config).run()
+    finally:
+        if worker is not None and worker.poll() is None:
+            worker.terminate()
+            try:
+                worker.wait(timeout=10)
+            except subprocess.TimeoutExpired:
+                worker.kill()
+                worker.wait()
 
 
 if __name__ == "__main__":

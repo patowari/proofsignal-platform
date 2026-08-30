@@ -86,8 +86,11 @@ class PipelineContext:
     text_by_origin: dict[str, str] = field(default_factory=dict)
     language: str = "en"
     claims: list[Any] = field(default_factory=list)
+    #: (claim, queries) pairs produced by GENERATING_QUERIES.
     queries: list[Any] = field(default_factory=list)
+    #: (claim, queries, candidates) triples produced by RETRIEVING_EVIDENCE.
     retrieved_documents: list[Any] = field(default_factory=list)
+    #: ClaimEvidenceResult per claim, from EXTRACTING_EVIDENCE.
     evidence: list[Any] = field(default_factory=list)
     media_analyses: list[Any] = field(default_factory=list)
 

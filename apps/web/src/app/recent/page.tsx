@@ -18,8 +18,9 @@ export default async function RecentPage() {
   }
 
   return (
-    <div className="mx-auto max-w-3xl px-5 py-12">
-      <h1 className="font-serif text-3xl font-semibold tracking-tight">
+    <div className="mx-auto max-w-4xl px-5 py-10 sm:py-16">
+      <p className="section-kicker">Public archive</p>
+      <h1 className="mt-2 font-serif text-4xl font-semibold tracking-tight sm:text-5xl">
         Recent verifications
       </h1>
       <p className="mt-2 text-sm text-muted">

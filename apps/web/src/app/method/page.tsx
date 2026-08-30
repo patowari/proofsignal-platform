@@ -8,8 +8,9 @@ export const metadata: Metadata = {
 
 export default function MethodPage() {
   return (
-    <div className="mx-auto max-w-3xl px-5 py-12 sm:py-16">
-      <h1 className="font-serif text-4xl font-semibold tracking-tight">
+    <div className="mx-auto max-w-4xl px-5 py-10 sm:py-16">
+      <p className="section-kicker">Transparent by design</p>
+      <h1 className="mt-2 font-serif text-4xl font-semibold tracking-tight sm:text-5xl">
         How this works
       </h1>
       <p className="mt-4 text-lg leading-relaxed text-muted">
@@ -21,7 +22,7 @@ export default function MethodPage() {
         <h2 id="process" className="font-serif text-2xl font-semibold">
           The process
         </h2>
-        <ol className="mt-4 space-y-4 text-sm leading-relaxed">
+        <ol className="method-steps mt-6 grid gap-3 text-sm leading-relaxed sm:grid-cols-2">
           <li>
             <strong className="font-medium">Claims are separated.</strong> A
             paragraph usually contains several factual assertions. We split them
@@ -60,7 +61,7 @@ export default function MethodPage() {
         <h2 id="verdicts" className="font-serif text-2xl font-semibold">
           What the verdicts mean
         </h2>
-        <dl className="mt-4 space-y-4 text-sm leading-relaxed">
+        <dl className="mt-6 grid gap-3 text-sm leading-relaxed sm:grid-cols-2">
           {[
             ["Verified", "Strong, independent evidence establishes the claim."],
             ["Likely true", "Good supporting evidence, with thin sourcing or minor gaps."],
@@ -72,7 +73,7 @@ export default function MethodPage() {
             ["Satire", "It comes from satire or parody and is not a sincere assertion."],
             ["Opinion", "It is a value judgement or prediction, which evidence cannot settle."],
           ].map(([term, definition]) => (
-            <div key={term}>
+            <div key={term} className="rounded-xl border border-rule bg-white p-4">
               <dt className="font-medium">{term}</dt>
               <dd className="text-muted">{definition}</dd>
             </div>

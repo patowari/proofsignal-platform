@@ -9,7 +9,6 @@
 import {
   CircleHelp,
   ExternalLink,
-  MinusCircle,
   ThumbsDown,
   ThumbsUp,
 } from "lucide-react";
@@ -25,7 +24,6 @@ import {
   degradationLabel,
   originLabel,
   relationshipLabel,
-  verdictPresentation,
 } from "@/lib/verdict";
 import { ShareButton } from "./share-button";
 import { VerdictBadge, VerdictBanner } from "./verdict-display";
@@ -37,7 +35,7 @@ export function ReportView({ report }: { report: VerificationReport }) {
   const hasEvidence = report.total_evidence > 0;
 
   return (
-    <article className="space-y-12">
+    <article className="space-y-10 sm:space-y-12">
       {/* 1. VERDICT */}
       <VerdictBanner
         verdict={report.overall_verdict}
@@ -178,14 +176,13 @@ function SectionHeading({
 }
 
 function ClaimCard({ claim, index }: { claim: Claim; index: number }) {
-  const presentation = verdictPresentation(claim.verdict);
   const supporting = claim.evidence.filter((e) => e.relationship === "SUPPORTS");
   const contradicting = claim.evidence.filter(
     (e) => e.relationship === "CONTRADICTS",
   );
 
   return (
-    <div className="rounded-lg border border-rule bg-surface p-5">
+    <div className="rounded-xl border border-rule bg-surface p-5 shadow-[0_4px_16px_rgba(0,0,0,.025)]">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2 text-xs text-muted">

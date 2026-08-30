@@ -72,7 +72,11 @@ def create_app() -> FastAPI:
         allow_origins=settings.cors_origins,
         allow_credentials=False,  # no auth, so no credentialed requests
         allow_methods=["GET", "POST", "OPTIONS"],
-        allow_headers=["Content-Type"],
+        allow_headers=["Content-Type", "Accept", "X-Request-Id"],
+        # Lets the browser read the correlation id, so a user-reported problem
+        # can be traced to its log line.
+        expose_headers=["X-Request-Id", "Retry-After"],
+        max_age=3600,
     )
 
     @app.middleware("http")

@@ -9,6 +9,7 @@
  */
 
 import { useQuery } from "@tanstack/react-query";
+import { useEffect, useState } from "react";
 import {
   AlertCircle,
   Check,
@@ -30,6 +31,13 @@ export function ProgressView({
   initialStatus?: VerificationStatusResponse;
   onComplete?: () => void;
 }) {
+  const [waitingLong, setWaitingLong] = useState(false);
+
+  useEffect(() => {
+    const timer = window.setTimeout(() => setWaitingLong(true), 12_000);
+    return () => window.clearTimeout(timer);
+  }, []);
+
   const { data, error } = useQuery({
     queryKey: ["verification-status", publicId],
     queryFn: () => getStatus(publicId),
@@ -81,9 +89,24 @@ export function ProgressView({
         <p className="mt-1 text-sm text-muted">
           {data.status === "FAILED"
             ? "We stopped before reaching a result. Details below."
-            : "Each step below reflects real progress on our side."}
+            : data.status === "QUEUED"
+              ? "Your check is queued and will begin as soon as the verification worker is available."
+              : "Each step below reflects real progress on our side."}
         </p>
       </div>
+
+      {waitingLong && data.status === "QUEUED" ? (
+        <div
+          className="rounded-xl border border-amber-300 bg-amber-50 p-4 text-sm text-amber-950"
+          role="status"
+        >
+          <p className="font-semibold">This is taking longer than expected.</p>
+          <p className="mt-1 leading-relaxed">
+            The verification worker may be offline. You can leave this page
+            open; checking will continue automatically when it reconnects.
+          </p>
+        </div>
+      ) : null}
 
       <ol className="space-y-0.5">
         {data.stages.map((stage) => (

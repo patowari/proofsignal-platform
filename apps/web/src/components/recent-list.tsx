@@ -1,4 +1,4 @@
-import { FileVideo, Image as ImageIcon, Link2, Loader2, Type } from "lucide-react";
+import { ArrowUpRight, FileVideo, Image as ImageIcon, Link2, Loader2, Type } from "lucide-react";
 import Link from "next/link";
 import type { RecentVerification, SubmissionType } from "@/lib/api/schemas";
 import { formatRelative } from "@/lib/utils";
@@ -56,7 +56,7 @@ export function RecentList({
           {emptyMessage ?? "Nothing here yet."}
         </p>
       ) : (
-        <ul className="divide-y divide-[var(--rule)]">
+        <ul className="mt-4 grid gap-3">
           {items.map((item) => (
             <li key={item.public_id}>
               <VerificationRow item={item} />
@@ -76,10 +76,10 @@ function VerificationRow({ item }: { item: RecentVerification }) {
   return (
     <Link
       href={`/verify/${item.public_id}`}
-      className="group flex items-start gap-4 py-4 transition-colors hover:bg-black/[0.02] dark:hover:bg-white/[0.03]"
+      className="group flex items-start gap-4 rounded-xl border border-rule bg-white p-4 transition-all hover:-translate-y-0.5 hover:border-[var(--green)] hover:shadow-[0_8px_24px_rgba(0,75,56,.08)]"
     >
       <Icon
-        className="mt-0.5 h-4 w-4 shrink-0 text-muted"
+        className="mt-0.5 h-5 w-5 shrink-0 text-[var(--green)]"
         aria-hidden="true"
       />
 
@@ -111,6 +111,7 @@ function VerificationRow({ item }: { item: RecentVerification }) {
         ) : (
           <VerdictBadge verdict={item.overall_verdict} size="small" />
         )}
+        <ArrowUpRight className="ml-auto mt-2 hidden h-4 w-4 text-muted transition-transform group-hover:translate-x-0.5 group-hover:-translate-y-0.5 sm:block" aria-hidden="true" />
       </div>
     </Link>
   );

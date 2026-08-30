@@ -1,33 +1,46 @@
 """Stage implementations.
 
-Current state: normalization, language detection, claim extraction, and scoring
-are real. Retrieval and evidence analysis are NOT yet implemented -- those land
-in later roadmap phases.
+Retrieval searches the news sources configured in `infrastructure/feeds.yaml`
+and any URL the user submits. It does NOT search the whole web, and the report
+says so: coverage is what we actually queried, nothing more.
 
-The honest consequence, which this module enforces: with no retrieval there is
-no evidence, and with no evidence every claim scores UNVERIFIED. That is the
-correct answer, and the report says plainly that evidence retrieval was
-unavailable. We never invent evidence to make the output look better, and we
-never let a fixture leak into a production run -- fixtures exist only inside
-tests. See docs/PRODUCT.md.
+When retrieval finds nothing relevant, the verdict is UNVERIFIED and the report
+states that plainly. We never invent evidence to make a result look more
+confident, and fixture data exists only inside tests -- never in a real run.
+See docs/PRODUCT.md.
 """
 
 from __future__ import annotations
 
 from typing import Any
 
+from sqlalchemy import select
+
 from app.core.enums import (
     ClaimOrigin,
     PipelineStage,
+    RetrievalProviderName,
 )
 from app.core.errors import StageFailedError
 from app.core.logging import get_logger
 from app.core.versions import CLAIM_EXTRACTION_VERSION
-from app.models import Claim
+from app.models import Claim, RetrievalQuery
+from app.retrieval.pipeline_ops import (
+    build_evidence_for_claim,
+    deduplicate_candidates,
+    retrieve_candidates,
+    signals_from_evidence,
+)
+from app.retrieval.scoring import build_queries
 from app.verification.claim_extraction import extract_claims
 from app.verification.language import detect_language
 from app.verification.pipeline import PipelineContext
-from app.verification.scoring import ClaimSignals, score_claim, score_overall
+from app.verification.scoring import (
+    ClaimSignals,
+    EvidenceSignal,
+    score_claim,
+    score_overall,
+)
 
 logger = get_logger(__name__)
 
@@ -60,19 +73,49 @@ def stage_normalizing(ctx: PipelineContext) -> dict[str, Any]:
 
 
 def stage_extracting_content(ctx: PipelineContext) -> dict[str, Any]:
-    """Fetch and extract content from a submitted URL.
+    """Fetch and extract the text of a submitted URL.
 
-    Not yet implemented. Rather than silently producing an empty result, this
-    records that URL content could not be retrieved, so the report can say so.
+    The article body becomes the content we extract claims from, so a URL
+    submission is verified on what the page actually says rather than on its
+    address.
     """
-    if not ctx.submission.submitted_url:
+    url = ctx.submission.submitted_url
+    if not url:
         return {"skipped": True, "reason": "no_url"}
 
-    ctx.degrade("url_extraction_not_implemented")
+    from app.retrieval.article import fetch_article
+    from app.retrieval.pipeline_ops import run_async
+
+    article = run_async(fetch_article(url))
+
+    if article is None:
+        # Inaccessible content is reported honestly. We do not bypass paywalls,
+        # logins, or platform restrictions, and we never pretend we read a page
+        # we could not reach.
+        ctx.degrade("url_content_unavailable")
+        return {
+            "degraded": True,
+            "reason": "url_content_unavailable",
+            "detail": (
+                "We could not read this page. It may be paywalled, private, "
+                "removed, or blocking automated readers."
+            ),
+        }
+
+    ctx.text_by_origin[ClaimOrigin.ARTICLE_TEXT.value] = article.text
+    if article.canonical_url:
+        ctx.submission.canonical_url = article.canonical_url
+    if article.title and not ctx.submission.title:
+        ctx.submission.title = article.title[:500]
+    ctx.session.flush()
+
     return {
-        "degraded": True,
-        "reason": "article_extraction_not_implemented",
-        "detail": "URL content extraction is not yet available; only the URL itself was recorded.",
+        "chars_extracted": len(article.text),
+        "title": (article.title or "")[:120],
+        "published_at": article.published_at.isoformat() if article.published_at else None,
+        # A page trying to instruct an automated reader is reported as a
+        # property of that source; it can never change a verdict.
+        "injection_detected": article.injection_detected,
     }
 
 
@@ -137,49 +180,157 @@ def stage_extracting_claims(ctx: PipelineContext) -> dict[str, Any]:
 
 
 def stage_generating_queries(ctx: PipelineContext) -> dict[str, Any]:
-    """Build retrieval queries, including cross-language variants.
+    """Build retrieval queries for each claim.
 
-    Not yet implemented -- lands with the retrieval phase.
+    Several query shapes per claim, because one form rarely serves every
+    source: the full claim matches close paraphrases, while a keyword-only form
+    matches reports that word the same facts differently.
     """
-    ctx.degrade("query_generation_not_implemented")
-    return {
-        "degraded": True,
-        "reason": "query_generation_not_implemented",
-    }
+    if not ctx.claims:
+        return {"skipped": True, "reason": "no_claims"}
+
+    total = 0
+    for claim in ctx.claims:
+        queries = build_queries(claim.claim_text, language=claim.language)
+        ctx.queries.append((claim, queries))
+        total += len(queries)
+
+    return {"claims": len(ctx.claims), "queries_generated": total}
 
 
 def stage_retrieving_evidence(ctx: PipelineContext) -> dict[str, Any]:
-    """Query retrieval providers.
+    """Search configured sources for documents relevant to each claim.
 
-    Not yet implemented. No evidence is produced, and none is invented: the
-    downstream effect is that claims score UNVERIFIED, which is the honest
-    outcome when nothing has been checked.
+    Coverage is limited to what is configured plus any submitted URL. Finding
+    nothing is a legitimate outcome, recorded honestly rather than papered over.
     """
-    ctx.degrade("evidence_retrieval_not_implemented")
+    from app.core.config import get_settings
+
+    if not ctx.queries:
+        return {"skipped": True, "reason": "no_queries"}
+
+    settings = get_settings()
+    total_candidates = 0
+    provider_errors: list[str] = []
+
+    for claim, queries in ctx.queries:
+        if not queries:
+            continue
+
+        candidates, errors = retrieve_candidates(
+            queries,
+            language=claim.language,
+            limit=settings.retrieval_candidate_limit,
+        )
+        provider_errors.extend(errors)
+
+        candidates = [
+            c for c in deduplicate_candidates(candidates) if c.score >= settings.retrieval_min_score
+        ]
+        ctx.retrieved_documents.append((claim, queries, candidates))
+        total_candidates += len(candidates)
+
+        # Log every query we ran, so "sources checked" is auditable rather than
+        # asserted.
+        for query in queries:
+            ctx.session.add(
+                RetrievalQuery(
+                    claim_id=claim.id,
+                    query_text=query[:2000],
+                    language=claim.language,
+                    provider=RetrievalProviderName.RSS_CORPUS,
+                    result_count=len(candidates),
+                    error="; ".join(provider_errors)[:255] or None,
+                )
+            )
+
+    ctx.session.flush()
+
+    if provider_errors:
+        ctx.degrade("some_sources_unreachable")
+
+    if total_candidates == 0:
+        # Not a failure: no relevant coverage is a real and common finding.
+        return {
+            "documents_found": 0,
+            "detail": "No relevant articles were found in the sources we checked.",
+            "provider_errors": provider_errors[:5],
+        }
+
     return {
-        "degraded": True,
-        "reason": "evidence_retrieval_not_implemented",
-        "detail": "No retrieval providers are active yet, so no evidence was gathered.",
-        "documents_found": 0,
+        "documents_found": total_candidates,
+        "claims_searched": len(ctx.queries),
+        "provider_errors": provider_errors[:5],
     }
 
 
 def stage_fetching_documents(ctx: PipelineContext) -> dict[str, Any]:
+    """Report the candidate set.
+
+    Bodies are fetched in EXTRACTING_EVIDENCE, where each fetch can be tied to
+    the claim it serves and the per-verification fetch budget applies.
+    """
     if not ctx.retrieved_documents:
         return {"skipped": True, "reason": "no_candidates"}
-    return {"documents": len(ctx.retrieved_documents)}
+    total = sum(len(candidates) for _, _, candidates in ctx.retrieved_documents)
+    return {"candidates": total}
 
 
 def stage_extracting_evidence(ctx: PipelineContext) -> dict[str, Any]:
+    """Fetch article bodies and extract claim-relevant passages.
+
+    A retrieved document is not evidence. Evidence is the specific passage that
+    speaks to a specific claim, which is what this stage isolates.
+    """
     if not ctx.retrieved_documents:
         return {"skipped": True, "reason": "no_documents"}
-    return {"evidence_items": len(ctx.evidence)}
+
+    total_documents = 0
+    total_evidence = 0
+
+    for claim, queries, candidates in ctx.retrieved_documents:
+        if not candidates:
+            continue
+        result = build_evidence_for_claim(
+            ctx.session,
+            claim_id=claim.id,
+            claim_text=claim.claim_text,
+            queries=queries,
+            language=claim.language,
+            candidates=candidates,
+        )
+        total_documents += result.documents_found
+        total_evidence += result.evidence_created
+        ctx.evidence.append(result)
+
+    return {"documents_read": total_documents, "evidence_extracted": total_evidence}
 
 
 def stage_classifying_evidence(ctx: PipelineContext) -> dict[str, Any]:
+    """Confirm evidence labelling.
+
+    Classification happens during extraction, where the passage and its claim
+    are both in hand. This stage reports the resulting distribution so the
+    progress UI and the stored record show what was actually decided.
+    """
     if not ctx.evidence:
         return {"skipped": True, "reason": "no_evidence"}
-    return {"classified": len(ctx.evidence)}
+
+    from app.models import Evidence as EvidenceModel
+
+    counts: dict[str, int] = {}
+    for result in ctx.evidence:
+        rows = (
+            ctx.session.execute(
+                select(EvidenceModel).where(EvidenceModel.claim_id == result.claim_id)
+            )
+            .scalars()
+            .all()
+        )
+        for row in rows:
+            counts[row.relationship_type.value] = counts.get(row.relationship_type.value, 0) + 1
+
+    return {"classified": sum(counts.values()), "distribution": counts}
 
 
 def stage_analyzing_media(ctx: PipelineContext) -> dict[str, Any]:
@@ -217,13 +368,29 @@ def stage_scoring(ctx: PipelineContext) -> dict[str, Any]:
         claim_id = str(claim.id)
         importances[claim_id] = claim.importance
 
-        # Evidence is empty until retrieval exists; scoring handles that
-        # correctly by returning UNVERIFIED rather than guessing.
+        # Load the evidence retrieval actually found. An empty list is a
+        # legitimate outcome and scoring handles it by returning UNVERIFIED.
+        evidence_signals = tuple(
+            EvidenceSignal(
+                relationship=relationship,
+                relevance=relevance,
+                source_type=source_type,
+                is_primary_source=is_primary,
+                # Items sharing a cluster are copies of one report, so only the
+                # strongest counts fully. This is what stops republication from
+                # reading as independent corroboration.
+                cluster_id=str(cluster_id) if cluster_id is not None else None,
+            )
+            for relationship, relevance, source_type, is_primary, cluster_id in (
+                signals_from_evidence(ctx.session, claim.id)
+            )
+        )
+
         signals = ClaimSignals(
             claim_id=claim_id,
             claim_type=claim.claim_type,
             importance=claim.importance,
-            evidence=(),
+            evidence=evidence_signals,
             penalties=(),
         )
         score = score_claim(signals)
@@ -258,25 +425,74 @@ def stage_generating_report(ctx: PipelineContext) -> dict[str, Any]:
 
     Built from what actually happened, so it cannot overstate what we did.
     """
+    from app.models import Evidence as EvidenceModel
+    from app.models import Source
+
     verification = ctx.verification
     claim_count = len(ctx.claims)
-    evidence_count = len(ctx.evidence)
 
-    if evidence_count == 0:
+    claim_ids = [c.id for c in ctx.claims]
+    rows = (
+        ctx.session.execute(select(EvidenceModel).where(EvidenceModel.claim_id.in_(claim_ids)))
+        .scalars()
+        .all()
+        if claim_ids
+        else []
+    )
+
+    supporting = sum(1 for r in rows if r.relationship_type.value == "SUPPORTS")
+    contradicting = sum(1 for r in rows if r.relationship_type.value == "CONTRADICTS")
+    origins = len({r.cluster_id for r in rows if r.cluster_id is not None}) + sum(
+        1 for r in rows if r.cluster_id is None
+    )
+
+    source_ids = {r.source_id for r in rows if r.source_id is not None}
+    publishers = []
+    for source_id in list(source_ids)[:6]:
+        source = ctx.session.get(Source, source_id)
+        if source and source.name:
+            publishers.append(source.name)
+
+    claim_word = "claim" if claim_count == 1 else "claims"
+
+    if not rows:
+        # Say what we searched and that finding nothing is not a finding of
+        # falsehood. This is the most important sentence in the product.
         summary = (
-            f"We identified {claim_count} factual "
-            f"{'claim' if claim_count == 1 else 'claims'} in this submission, but we were "
-            f"not able to check {'it' if claim_count == 1 else 'them'} against any evidence. "
-            "Evidence retrieval is not yet available in this build, so no sources were "
-            "searched. This result means the claims are unverified — it does not mean they "
-            "are false."
+            f"We identified {claim_count} factual {claim_word} in this submission and "
+            f"searched our indexed news sources, but found nothing relevant enough to "
+            f"confirm or contradict {'it' if claim_count == 1 else 'them'}. "
+            "That means the claim is unverified — it does not mean it is false. "
+            "Our coverage is limited to the sources we index, so absence here is not "
+            "absence everywhere."
         )
     else:
-        summary = (
-            f"We identified {claim_count} factual "
-            f"{'claim' if claim_count == 1 else 'claims'} and examined {evidence_count} "
-            f"pieces of evidence."
-        )
+        parts = [
+            f"We identified {claim_count} factual {claim_word} and examined "
+            f"{len(rows)} passages from {origins} independent "
+            f"{'source' if origins == 1 else 'sources'}."
+        ]
+        if supporting and contradicting:
+            parts.append(
+                f"{supporting} passage{'s' if supporting != 1 else ''} supported the "
+                f"claims and {contradicting} contradicted them."
+            )
+        elif supporting:
+            parts.append(
+                f"{supporting} passage{'s' if supporting != 1 else ''} supported the claims."
+            )
+        elif contradicting:
+            parts.append(
+                f"{contradicting} passage{'s' if contradicting != 1 else ''} contradicted "
+                "the claims."
+            )
+        else:
+            parts.append(
+                "The passages we found were related but did not settle the claims either way."
+            )
+        if publishers:
+            parts.append("Sources checked: " + ", ".join(sorted(publishers)) + ".")
+        summary = " ".join(parts)
 
     verification.summary = summary
     ctx.session.flush()

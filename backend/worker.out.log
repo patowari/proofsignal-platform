@@ -1,0 +1,30 @@
+2026-08-30T11:45:00.357741Z [info     ] worker.started                 consumer=Zubayer-d63d083e max_jobs=None queue=verification
+2026-08-30T11:45:00.399307Z [info     ] queue.reserved                 attempt=1 job_id=57e1629de85c40019a8b21adfc44cc59
+2026-08-30T11:45:00.823661Z [error    ] pipeline.stage_failed          error='There is no text to extract claims from.' error_type=StageFailedError stage=EXTRACTING_CLAIMS verification_id=vfy_PsjHjjXvjc9qjMQx
+2026-08-30T11:45:00.854393Z [error    ] pipeline.failed                error_code=STAGE_FAILED stage=EXTRACTING_CLAIMS verification_id=vfy_PsjHjjXvjc9qjMQx
+2026-08-30T11:45:00.870132Z [info     ] queue.completed                job_id=57e1629de85c40019a8b21adfc44cc59 verification_id=vfy_PsjHjjXvjc9qjMQx
+2026-08-30T11:45:00.883080Z [info     ] worker.job_completed           duration_ms=469 job_id=57e1629de85c40019a8b21adfc44cc59 verification_id=vfy_PsjHjjXvjc9qjMQx
+2026-08-30T11:45:00.896296Z [info     ] queue.reserved                 attempt=1 job_id=cd84c0d6aa5d409cbccea42b5095301e
+2026-08-30T11:45:01.093099Z [error    ] pipeline.stage_failed          error='There is no text to extract claims from.' error_type=StageFailedError stage=EXTRACTING_CLAIMS verification_id=vfy_JT8Tc17hwFhVC9PA
+2026-08-30T11:45:01.109729Z [error    ] pipeline.failed                error_code=STAGE_FAILED stage=EXTRACTING_CLAIMS verification_id=vfy_JT8Tc17hwFhVC9PA
+2026-08-30T11:45:01.119554Z [info     ] queue.completed                job_id=cd84c0d6aa5d409cbccea42b5095301e verification_id=vfy_JT8Tc17hwFhVC9PA
+2026-08-30T11:45:01.122565Z [info     ] worker.job_completed           duration_ms=202 job_id=cd84c0d6aa5d409cbccea42b5095301e verification_id=vfy_JT8Tc17hwFhVC9PA
+2026-08-30T11:51:13.757404Z [info     ] queue.reserved                 attempt=1 job_id=7cc8325eb23745c0a6eee69e8cbdd62f
+2026-08-30T11:51:13.953574Z [info     ] pipeline.degraded              reason=query_generation_not_implemented verification_id=vfy_fh4NKYaTweXfFEgr
+2026-08-30T11:51:13.988233Z [info     ] pipeline.degraded              reason=evidence_retrieval_not_implemented verification_id=vfy_fh4NKYaTweXfFEgr
+2026-08-30T11:51:14.185000Z [info     ] pipeline.completed             degraded=True verdict=UNVERIFIED verification_id=vfy_fh4NKYaTweXfFEgr
+2026-08-30T11:51:14.194059Z [info     ] queue.completed                job_id=7cc8325eb23745c0a6eee69e8cbdd62f verification_id=vfy_fh4NKYaTweXfFEgr
+2026-08-30T11:51:14.200604Z [info     ] worker.job_completed           duration_ms=436 job_id=7cc8325eb23745c0a6eee69e8cbdd62f verification_id=vfy_fh4NKYaTweXfFEgr
+2026-08-30T11:51:56.973141Z [info     ] queue.reserved                 attempt=1 job_id=ca2d10b9f73e48119d00ad6d086c6037
+2026-08-30T11:51:57.113099Z [info     ] pipeline.degraded              reason=url_extraction_not_implemented verification_id=vfy_avBDYJ7jVKbC9c08
+2026-08-30T11:51:57.176856Z [error    ] pipeline.stage_failed          error='There is no text to extract claims from.' error_type=StageFailedError stage=EXTRACTING_CLAIMS verification_id=vfy_avBDYJ7jVKbC9c08
+2026-08-30T11:51:57.192749Z [error    ] pipeline.failed                error_code=STAGE_FAILED stage=EXTRACTING_CLAIMS verification_id=vfy_avBDYJ7jVKbC9c08
+2026-08-30T11:51:57.199813Z [info     ] queue.completed                job_id=ca2d10b9f73e48119d00ad6d086c6037 verification_id=vfy_avBDYJ7jVKbC9c08
+2026-08-30T11:51:57.204351Z [info     ] worker.job_completed           duration_ms=202 job_id=ca2d10b9f73e48119d00ad6d086c6037 verification_id=vfy_avBDYJ7jVKbC9c08
+2026-08-30T11:55:12.788298Z [info     ] queue.reserved                 attempt=1 job_id=c6624488d78941798b88bb9b3c705e5e
+2026-08-30T11:55:12.968709Z [info     ] pipeline.degraded              reason=query_generation_not_implemented verification_id=vfy_q9gCKqxBBcCaZBrg
+2026-08-30T11:55:13.010682Z [info     ] pipeline.degraded              reason=evidence_retrieval_not_implemented verification_id=vfy_q9gCKqxBBcCaZBrg
+2026-08-30T11:55:13.142936Z [info     ] pipeline.degraded              reason=media_analysis_not_implemented verification_id=vfy_q9gCKqxBBcCaZBrg
+2026-08-30T11:55:13.267334Z [info     ] pipeline.completed             degraded=True verdict=UNVERIFIED verification_id=vfy_q9gCKqxBBcCaZBrg
+2026-08-30T11:55:13.277666Z [info     ] queue.completed                job_id=c6624488d78941798b88bb9b3c705e5e verification_id=vfy_q9gCKqxBBcCaZBrg
+2026-08-30T11:55:13.285507Z [info     ] worker.job_completed           duration_ms=485 job_id=c6624488d78941798b88bb9b3c705e5e verification_id=vfy_q9gCKqxBBcCaZBrg

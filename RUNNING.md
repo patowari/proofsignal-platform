@@ -18,7 +18,18 @@ by other stacks.
 
 You need **Docker Desktop**, **Python 3.12**, **Node 20+**, and **pnpm**.
 
-```bash
+> **Shell note.** Commands below are written for **Windows PowerShell**, which
+> is what this project was developed on. PowerShell 5.1 has no `&&` operator —
+> use `;` to chain, or just run the lines separately:
+>
+> ```powershell
+> cd backend; .venv/Scripts/python run_api.py --port 8123
+> ```
+>
+> On macOS, Linux, or Git Bash use `&&` and `.venv/bin/...` instead of
+> `.venv/Scripts/...`.
+
+```powershell
 # 1. Backend virtualenv  (from repo root)
 cd backend
 py -3.12 -m venv .venv
@@ -44,21 +55,21 @@ Open **four terminals**. All paths are from the repository root.
 
 ### Terminal 1 — infrastructure
 
-```bash
+```powershell
 docker compose up -d
 docker compose ps          # all three should read "healthy"
 ```
 
 First run only, to create the tables:
 
-```bash
+```powershell
 cd backend
 .venv/Scripts/python -m alembic upgrade head
 ```
 
 ### Terminal 2 — API server
 
-```bash
+```powershell
 cd backend
 .venv/Scripts/python run_api.py --port 8123
 ```
@@ -69,7 +80,7 @@ fails with `InterfaceError`; this entrypoint installs a compatible loop first.
 
 ### Terminal 3 — verification worker
 
-```bash
+```powershell
 cd backend
 .venv/Scripts/python -m app.workers.worker
 ```
@@ -79,7 +90,7 @@ the worker performs it.
 
 ### Terminal 4 — frontend
 
-```bash
+```powershell
 cd apps/web
 pnpm dev --port 3100
 ```
@@ -154,16 +165,31 @@ tab first — Postman cannot store a file path in a shared collection.
 
 ### Command line, if you prefer
 
+In PowerShell, `curl` is an alias for `Invoke-WebRequest` and does not take
+curl's flags. Use `Invoke-RestMethod`, which also parses the JSON for you:
+
+```powershell
+# Submit, keeping the returned id
+$body = @{ text = "A 7.8 magnitude earthquake hit Japan today, killing 500 people." } | ConvertTo-Json
+$r = Invoke-RestMethod -Uri http://127.0.0.1:8123/api/submissions/text -Method Post -ContentType 'application/json' -Body $body
+$id = $r.verification_public_id
+$id
+
+# Poll status
+Invoke-RestMethod "http://127.0.0.1:8123/api/verifications/$id/status" | Select-Object status, stage_index, stage_count
+
+# Full report
+Invoke-RestMethod "http://127.0.0.1:8123/api/verifications/$id" | ConvertTo-Json -Depth 6
+```
+
+Git Bash, macOS, or Linux:
+
 ```bash
-# Submit and capture the id
 curl -s -X POST http://127.0.0.1:8123/api/submissions/text \
   -H 'Content-Type: application/json' \
   -d '{"text":"A 7.8 magnitude earthquake hit Japan today, killing 500 people."}'
 
-# Poll status  (substitute the id from above)
 curl -s http://127.0.0.1:8123/api/verifications/vfy_XXXX/status
-
-# Full report
 curl -s http://127.0.0.1:8123/api/verifications/vfy_XXXX
 ```
 
@@ -173,7 +199,7 @@ Interactive API docs: **http://127.0.0.1:8123/api/docs**
 
 ## Running the test suites
 
-```bash
+```powershell
 # Backend  (from backend/)  — 321 tests, no Docker or network needed
 .venv/Scripts/python -m pytest
 
@@ -181,7 +207,8 @@ Interactive API docs: **http://127.0.0.1:8123/api/docs**
 .venv/Scripts/python -m pytest -m integration
 
 # Lint and types
-.venv/Scripts/python -m ruff check . && .venv/Scripts/python -m mypy app
+.venv/Scripts/python -m ruff check .
+.venv/Scripts/python -m mypy app
 
 # Frontend  (from apps/web/)
 pnpm typecheck
@@ -192,21 +219,22 @@ pnpm build
 
 ## Inspecting the data directly
 
-```bash
+```powershell
 # What has been submitted and what came of it
-docker exec verifier-postgres psql -U verifier -d verifier \
-  -c "SELECT public_id, status, overall_verdict, current_stage FROM verifications ORDER BY id DESC LIMIT 10;"
+docker exec verifier-postgres psql -U verifier -d verifier -c "SELECT public_id, status, overall_verdict, current_stage FROM verifications ORDER BY id DESC LIMIT 10;"
 
-# Real stage transitions for one verification
-docker exec verifier-postgres psql -U verifier -d verifier \
-  -c "SELECT sequence, stage, status, duration_ms FROM verification_stages ORDER BY id DESC LIMIT 12;"
+# Real stage transitions, newest verification first
+docker exec verifier-postgres psql -U verifier -d verifier -c "SELECT sequence, stage, status, duration_ms FROM verification_stages ORDER BY id DESC LIMIT 12;"
+
+# Claims extracted from the most recent submission
+docker exec verifier-postgres psql -U verifier -d verifier -c "SELECT claim_type, verdict, importance, left(claim_text, 60) FROM claims ORDER BY id DESC LIMIT 5;"
 
 # Queue depth and dead-lettered jobs
 docker exec verifier-redis redis-cli LLEN queue:verification:pending
 docker exec verifier-redis redis-cli LLEN queue:verification:dead
 
 # Uploaded media  (MinIO console, login minioadmin / minioadmin)
-open http://localhost:59001
+start http://localhost:59001      # PowerShell;  use `open` on macOS
 ```
 
 ---
@@ -231,6 +259,10 @@ somewhere else.
 **`/api/ready` reports `degraded`.** Expected without Ollama and Tesseract. Both
 are optional: claim extraction falls back to rules, and OCR is skipped and
 reported as unavailable rather than as "no text found".
+
+**`The token '&&' is not a valid statement separator in this version.`** You are
+on Windows PowerShell 5.1, which has no `&&`. Use `;` instead, or run the two
+commands on separate lines.
 
 **Docker daemon not reachable.** Start Docker Desktop and wait for the engine —
 `docker version` should print a Server section.

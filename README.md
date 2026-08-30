@@ -131,10 +131,13 @@ the report — never a crash, and never a wrong verdict.
 ### Backend
 
 ```bash
+# Windows PowerShell (no && operator - chain with ; or use separate lines)
 cd backend
 py -3.12 -m venv .venv
-.venv/Scripts/python -m pip install -e ".[dev]"     # Windows
-# source .venv/bin/activate && pip install -e ".[dev]"   # macOS / Linux
+.venv/Scripts/python -m pip install -e ".[dev]"
+
+# macOS / Linux
+# python3.12 -m venv .venv && source .venv/bin/activate && pip install -e ".[dev]" 
 
 .venv/Scripts/python -m pytest                       # 210 tests, offline
 ```
@@ -185,7 +188,8 @@ hardware and set `OLLAMA_TEXT_MODEL` accordingly.
 .venv/Scripts/python -m pytest                    # default: offline, deterministic
 .venv/Scripts/python -m pytest -m integration     # needs docker compose up
 .venv/Scripts/python -m pytest -m live            # needs internet (GDELT, RSS)
-.venv/Scripts/python -m ruff check . && .venv/Scripts/python -m ruff format .
+.venv/Scripts/python -m ruff check .
+.venv/Scripts/python -m ruff format .
 .venv/Scripts/python -m mypy app
 ```
 

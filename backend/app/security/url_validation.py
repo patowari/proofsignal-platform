@@ -321,7 +321,7 @@ def validate_url(raw_url: str) -> ValidatedURL:
         raise _reject("bad_port", "port is not a valid integer") from None
 
     settings = get_settings()
-    if port not in settings.allowed_url_ports:
+    if port not in settings.allowed_port_list:
         raise _reject("blocked_port", f"port {port} is not allowed")
 
     # Reject internal names before resolution so we fail closed even if DNS

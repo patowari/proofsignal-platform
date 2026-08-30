@@ -10,15 +10,28 @@ degrading rather than crashing when optional services are absent.
 from __future__ import annotations
 
 from functools import lru_cache
+from pathlib import Path
 from typing import Literal
 
-from pydantic import Field, field_validator
+from pydantic import field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+#: Candidate .env locations, resolved from this file rather than the working
+#: directory. A bare ".env" is looked up relative to wherever the process was
+#: started, so running the API from backend/ silently found nothing and every
+#: setting fell back to its default -- including database ports and API keys,
+#: with no error to indicate it.
+_BACKEND_ROOT = Path(__file__).resolve().parents[2]
+_ENV_FILES = (
+    _BACKEND_ROOT / ".env",  # backend-local override, if one exists
+    _BACKEND_ROOT.parent / ".env",  # repository root, where ours lives
+)
 
 
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(
-        env_file=".env",
+        # Later files win, so a backend-local .env can override the shared one.
+        env_file=tuple(str(path) for path in _ENV_FILES),
         env_file_encoding="utf-8",
         extra="ignore",
         case_sensitive=False,
@@ -34,13 +47,12 @@ class Settings(BaseSettings):
     #: a browser even though they resolve to the same host, so both forms of
     #: each dev port are listed -- otherwise the frontend works at one and is
     #: blocked at the other. Production sets this explicitly via env.
-    cors_origins: list[str] = Field(
-        default_factory=lambda: [
-            "http://localhost:3100",
-            "http://127.0.0.1:3100",
-            "http://localhost:3000",
-            "http://127.0.0.1:3000",
-        ]
+    #: Comma-separated, not a list field. pydantic-settings JSON-decodes list
+    #: fields from a .env before any validator runs, so a plain
+    #: "a,b" value raises a parse error rather than reaching our splitter.
+    #: Read it through `cors_origin_list`.
+    cors_origins: str = (
+        "http://localhost:3100,http://127.0.0.1:3100,http://localhost:3000,http://127.0.0.1:3000"
     )
     log_level: str = "INFO"
     log_format: Literal["json", "console"] = "console"
@@ -82,7 +94,7 @@ class Settings(BaseSettings):
     groq_enabled: bool = False
     groq_api_key: str = ""
     groq_base_url: str = "https://api.groq.com/openai/v1"
-    groq_model: str = "llama-3.3-70b-versatile"
+    groq_model: str = "qwen/qwen3.8-27b"
     groq_timeout_seconds: float = 45.0
 
     # ---- Media tooling --------------------------------------------------
@@ -110,7 +122,9 @@ class Settings(BaseSettings):
     fetch_timeout_seconds: float = 20.0
     fetch_connect_timeout_seconds: float = 8.0
     max_redirects: int = 5
-    allowed_url_ports: list[int] = Field(default_factory=lambda: [80, 443])
+    #: Comma-separated for the same reason as cors_origins. Read it through
+    #: `allowed_port_list`.
+    allowed_url_ports: str = "80,443"
     user_agent: str = "VerifierBot/1.0 (+https://example.org/about-our-bot)"
 
     # ---- Rate limits (per client fingerprint, per window) ---------------
@@ -161,16 +175,30 @@ class Settings(BaseSettings):
     #: through the SSRF-safe fetcher, so this bounds latency directly.
     max_article_fetches: int = 6
 
-    @field_validator("cors_origins", "allowed_url_ports", mode="before")
-    @classmethod
-    def _split_csv(cls, value: object) -> object:
-        """Accept comma-separated env values as well as JSON lists."""
-        if isinstance(value, str):
-            stripped = value.strip()
-            if stripped.startswith("["):
-                return value
-            return [item.strip() for item in stripped.split(",") if item.strip()]
-        return value
+    @property
+    def cors_origin_list(self) -> list[str]:
+        """Allowed browser origins.
+
+        localhost and 127.0.0.1 are distinct origins to a browser even though
+        they resolve to the same host, so both spellings of each dev port are
+        listed -- otherwise the app works at one address and is blocked at the
+        other.
+        """
+        return [origin.strip() for origin in self.cors_origins.split(",") if origin.strip()]
+
+    @property
+    def allowed_port_list(self) -> list[int]:
+        """Ports a user-supplied URL may target.
+
+        Deliberately narrow: non-standard ports are the endpoint of most SSRF
+        chains. A malformed entry is dropped rather than widening the set.
+        """
+        ports: list[int] = []
+        for raw in self.allowed_url_ports.split(","):
+            raw = raw.strip()
+            if raw.isdigit():
+                ports.append(int(raw))
+        return ports or [80, 443]
 
     @field_validator("debug", mode="before")
     @classmethod

@@ -41,3 +41,6 @@ test-results/
 Thumbs.db
 .idea/
 .vscode/
+
+# Alembic local state
+backend/alembic/versions/__pycache__/

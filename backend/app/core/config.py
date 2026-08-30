@@ -35,13 +35,13 @@ class Settings(BaseSettings):
     log_format: Literal["json", "console"] = "console"
 
     # ---- Datastores -----------------------------------------------------
-    database_url: str = "postgresql+psycopg://verifier:verifier@localhost:5432/verifier"
+    database_url: str = "postgresql+psycopg://verifier:verifier@localhost:55432/verifier"
     database_pool_size: int = 10
     database_max_overflow: int = 20
-    redis_url: str = "redis://localhost:6379/0"
+    redis_url: str = "redis://localhost:56379/0"
 
     # ---- Object storage (MinIO / S3-compatible) -------------------------
-    minio_endpoint: str = "http://localhost:9000"
+    minio_endpoint: str = "http://localhost:59000"
     minio_access_key: str = "minioadmin"
     minio_secret_key: str = "minioadmin"  # noqa: S105 - local dev default, overridden in every real deployment
     minio_bucket: str = "verifier-media"

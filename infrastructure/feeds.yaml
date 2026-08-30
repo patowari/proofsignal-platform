@@ -95,6 +95,33 @@ feeds:
     source_type: NEWS_ORGANIZATION
     enabled: true
 
+  - name: Risingbd
+    url: https://www.risingbd.com/rss/rss.xml
+    domain: risingbd.com
+    language: bn
+    country: BD
+    category: general
+    source_type: NEWS_ORGANIZATION
+    enabled: true
+
+  - name: Dhaka Post
+    url: https://www.dhakapost.com/rss/rss.xml
+    domain: dhakapost.com
+    language: bn
+    country: BD
+    category: general
+    source_type: NEWS_ORGANIZATION
+    enabled: true
+
+  - name: Ajker Patrika
+    url: https://www.ajkerpatrika.com/feed
+    domain: ajkerpatrika.com
+    language: bn
+    country: BD
+    category: general
+    source_type: NEWS_ORGANIZATION
+    enabled: true
+
   # ---- Bangladesh, English -----------------------------------------------
   - name: The Daily Star
     url: https://www.thedailystar.net/rss.xml

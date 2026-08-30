@@ -74,6 +74,17 @@ class Settings(BaseSettings):
     nli_model: str = "MoritzLaurer/mDeBERTa-v3-base-xnli-multilingual-nli-2mil7"
     nli_enabled: bool = True
 
+    # ---- Groq (optional, hosted) ----------------------------------------
+    # Off unless a key is set. The project must run with zero keys, so the
+    # no-key path stays the default and is what the test suite exercises.
+    # Submitted text leaves the machine when this is on -- that is the tradeoff
+    # for much better multilingual claim and evidence understanding.
+    groq_enabled: bool = False
+    groq_api_key: str = ""
+    groq_base_url: str = "https://api.groq.com/openai/v1"
+    groq_model: str = "llama-3.3-70b-versatile"
+    groq_timeout_seconds: float = 45.0
+
     # ---- Media tooling --------------------------------------------------
     ffmpeg_path: str = "ffmpeg"
     ffprobe_path: str = "ffprobe"
@@ -141,9 +152,11 @@ class Settings(BaseSettings):
     rss_feed_timeout_seconds: float = 8.0
     #: Cap on feeds queried per verification, bounding worst-case latency.
     rss_max_feeds_per_query: int = 20
-    #: Minimum retrieval score for a candidate to become evidence. Below this a
-    #: match is coincidental word overlap, not relevance.
-    retrieval_min_score: float = 0.18
+    #: Minimum retrieval score for a candidate to become evidence. Tuned against
+    #: live Bangla feeds: genuinely relevant articles scored around 0.16, so a
+    #: higher cut silently discarded real evidence. The discriminating-term rule
+    #: in retrieval/scoring.py is what keeps coincidental matches out, not this.
+    retrieval_min_score: float = 0.12
     #: Article bodies fetched per verification. Each is a full HTTP round trip
     #: through the SSRF-safe fetcher, so this bounds latency directly.
     max_article_fetches: int = 6

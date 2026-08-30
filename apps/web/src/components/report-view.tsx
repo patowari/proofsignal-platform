@@ -1,3 +1,5 @@
+"use client";
+
 /**
  * Verification report.
  *
@@ -18,17 +20,20 @@ import type {
   MediaAnalysis,
   VerificationReport,
 } from "@/lib/api/schemas";
-import { cn, formatDate, hostFromUrl } from "@/lib/utils";
 import {
-  claimTypeLabel,
-  degradationLabel,
-  originLabel,
-  relationshipLabel,
-} from "@/lib/verdict";
+  degradationCopy,
+  originCopy,
+  relationshipCopy,
+  type Locale,
+} from "@/lib/i18n";
+import { cn, formatDate, hostFromUrl } from "@/lib/utils";
+import { claimTypeLabel } from "@/lib/verdict";
+import { useLocale } from "./locale-provider";
 import { ShareButton } from "./share-button";
 import { VerdictBadge, VerdictBanner } from "./verdict-display";
 
 export function ReportView({ report }: { report: VerificationReport }) {
+  const { locale, t } = useLocale();
   const unresolved = report.claims.filter(
     (c) => !c.verdict || c.verdict === "UNVERIFIED",
   );
@@ -64,15 +69,19 @@ export function ReportView({ report }: { report: VerificationReport }) {
         <section aria-labelledby="claims-heading">
           <SectionHeading
             id="claims-heading"
-            title="Claims we checked"
-            description={`${report.claims.length} ${
-              report.claims.length === 1 ? "claim" : "claims"
-            } extracted from this submission, each checked separately.`}
+            title={t("claimsWeChecked")}
+            description={
+            locale === "bn"
+              ? `${report.claims.length}টি দাবি আলাদাভাবে যাচাই করা হয়েছে।`
+              : `${report.claims.length} ${
+                  report.claims.length === 1 ? "claim" : "claims"
+                } extracted from this submission, each checked separately.`
+          }
           />
           <ol className="mt-5 space-y-4">
             {report.claims.map((claim, index) => (
               <li key={`${claim.sequence}-${index}`}>
-                <ClaimCard claim={claim} index={index + 1} />
+                <ClaimCard claim={claim} index={index + 1} locale={locale} />
               </li>
             ))}
           </ol>
@@ -83,7 +92,7 @@ export function ReportView({ report }: { report: VerificationReport }) {
       <section aria-labelledby="evidence-heading">
         <SectionHeading
           id="evidence-heading"
-          title="Evidence"
+          title={t("evidence")}
           description={
             hasEvidence
               ? `${report.independent_origins} independent ${
@@ -99,12 +108,12 @@ export function ReportView({ report }: { report: VerificationReport }) {
             <EvidenceTally
               tone="support"
               count={report.supporting_evidence}
-              label="Supporting"
+              label={t("supporting")}
             />
             <EvidenceTally
               tone="contradict"
               count={report.contradicting_evidence}
-              label="Contradicting"
+              label={t("contradicting")}
             />
           </div>
         ) : (
@@ -117,8 +126,8 @@ export function ReportView({ report }: { report: VerificationReport }) {
         <section aria-labelledby="unknown-heading">
           <SectionHeading
             id="unknown-heading"
-            title="What remains unknown"
-            description="We could not settle these claims either way."
+            title={t("whatRemainsUnknown")}
+            description={t("unknownSubtitle")}
           />
           <ul className="mt-5 space-y-3">
             {unresolved.map((claim, index) => (
@@ -135,8 +144,7 @@ export function ReportView({ report }: { report: VerificationReport }) {
             ))}
           </ul>
           <p className="mt-4 text-sm text-muted">
-            Unverified is not the same as false. It means the evidence available
-            to us was not enough to decide.
+            {t("unverifiedNotFalse")}
           </p>
         </section>
       ) : null}
@@ -175,7 +183,16 @@ function SectionHeading({
   );
 }
 
-function ClaimCard({ claim, index }: { claim: Claim; index: number }) {
+function ClaimCard({
+  claim,
+  index,
+  locale,
+}: {
+  claim: Claim;
+  index: number;
+  locale: Locale;
+}) {
+  const { t } = useLocale();
   const supporting = claim.evidence.filter((e) => e.relationship === "SUPPORTS");
   const contradicting = claim.evidence.filter(
     (e) => e.relationship === "CONTRADICTS",
@@ -186,14 +203,16 @@ function ClaimCard({ claim, index }: { claim: Claim; index: number }) {
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2 text-xs text-muted">
-            <span className="font-medium">Claim {index}</span>
+            <span className="font-medium">
+              {t("claimLabel")} {index}
+            </span>
             <span aria-hidden="true">·</span>
             <span>{claimTypeLabel(claim.claim_type)}</span>
             {/* Origin matters: an authentic file can carry a false caption. */}
             {claim.origin !== "USER_TEXT" ? (
               <>
                 <span aria-hidden="true">·</span>
-                <span>{originLabel(claim.origin)}</span>
+                <span>{originCopy(claim.origin, locale)}</span>
               </>
             ) : null}
           </div>
@@ -212,23 +231,25 @@ function ClaimCard({ claim, index }: { claim: Claim; index: number }) {
         <div className="mt-5 space-y-4 border-t border-rule pt-4">
           {supporting.length > 0 ? (
             <EvidenceGroup
-              title="Supporting evidence"
+              title={t("supportingEvidence")}
               items={supporting}
               tone="support"
+              locale={locale}
             />
           ) : null}
           {/* Always rendered when present, even under a positive verdict. */}
           {contradicting.length > 0 ? (
             <EvidenceGroup
-              title="Contradicting evidence"
+              title={t("contradictingEvidence")}
               items={contradicting}
               tone="contradict"
+              locale={locale}
             />
           ) : null}
         </div>
       ) : (
         <p className="mt-4 border-t border-rule pt-4 text-sm text-muted">
-          No evidence was found for this claim.
+          {t("noEvidenceForClaim")}
         </p>
       )}
 
@@ -248,10 +269,12 @@ function EvidenceGroup({
   title,
   items,
   tone,
+  locale,
 }: {
   title: string;
   items: Evidence[];
   tone: "support" | "contradict";
+  locale: Locale;
 }) {
   const Icon = tone === "support" ? ThumbsUp : ThumbsDown;
   return (
@@ -271,7 +294,7 @@ function EvidenceGroup({
       <ul className="mt-2.5 space-y-3">
         {items.map((item, index) => (
           <li key={index}>
-            <EvidenceItem evidence={item} />
+            <EvidenceItem evidence={item} locale={locale} />
           </li>
         ))}
       </ul>
@@ -279,7 +302,8 @@ function EvidenceGroup({
   );
 }
 
-function EvidenceItem({ evidence }: { evidence: Evidence }) {
+function EvidenceItem({ evidence, locale }: { evidence: Evidence; locale: Locale }) {
+  const { t } = useLocale();
   const host = hostFromUrl(evidence.document_url) ?? evidence.source_domain;
 
   return (
@@ -288,7 +312,9 @@ function EvidenceItem({ evidence }: { evidence: Evidence }) {
         {evidence.evidence_text}
       </blockquote>
       <div className="mt-2 flex flex-wrap items-center gap-x-2.5 gap-y-1 text-xs text-muted">
-        <span className="font-medium">{relationshipLabel(evidence.relationship)}</span>
+        <span className="font-medium">
+          {relationshipCopy(evidence.relationship, locale)}
+        </span>
         {host ? (
           <>
             <span aria-hidden="true">·</span>
@@ -312,7 +338,7 @@ function EvidenceItem({ evidence }: { evidence: Evidence }) {
               rel="noopener noreferrer nofollow"
               className="inline-flex items-center gap-1 underline"
             >
-              Source
+              {t("sourceLink")}
               <ExternalLink className="h-3 w-3" aria-hidden="true" />
             </a>
           </>
@@ -346,31 +372,32 @@ function EvidenceTally({
 }
 
 function NoEvidencePanel() {
+  const { t } = useLocale();
   return (
     <div className="mt-5 rounded-lg border border-rule bg-surface p-5">
       <p className="text-sm leading-relaxed">
-        We did not find any evidence for or against this submission.
+        {t("noEvidenceFound")}
       </p>
       <p className="mt-2 text-sm leading-relaxed text-muted">
-        That is a statement about our coverage, not about the claim. Absence of
-        evidence is not evidence that something is false.
+        {t("noEvidenceExplain")}
       </p>
     </div>
   );
 }
 
 function LimitationsPanel({ reasons }: { reasons: string[] }) {
+  const { locale, t } = useLocale();
   return (
     <section
       aria-labelledby="limitations-heading"
       className="rounded-lg border border-amber-300 bg-amber-50 p-5 dark:border-amber-900 dark:bg-amber-950/30"
     >
       <h2 id="limitations-heading" className="text-sm font-semibold">
-        Limitations in this check
+        {t("limitationsHeading")}
       </h2>
       <ul className="mt-2.5 space-y-1.5 text-sm leading-relaxed opacity-90">
         {reasons.map((reason) => (
-          <li key={reason}>{degradationLabel(reason)}</li>
+          <li key={reason}>{degradationCopy(reason, locale)}</li>
         ))}
       </ul>
     </section>
@@ -378,12 +405,13 @@ function LimitationsPanel({ reasons }: { reasons: string[] }) {
 }
 
 function OriginalSubmission({ report }: { report: VerificationReport }) {
+  const { t } = useLocale();
   const { submission } = report;
   return (
     <section aria-labelledby="submission-heading">
       <SectionHeading
         id="submission-heading"
-        title="What was submitted"
+        title={t("whatWasSubmitted")}
       />
       <div className="mt-5 rounded-lg border border-rule bg-surface p-5">
         {submission.title ? (
@@ -414,7 +442,7 @@ function OriginalSubmission({ report }: { report: VerificationReport }) {
         {submission.caption ? (
           <div className="mt-3 border-t border-rule pt-3">
             <p className="text-xs font-medium text-muted">
-              Caption supplied with this file
+              {t("captionSuppliedWith")}
             </p>
             <p className="mt-1 text-sm leading-relaxed" dir="auto">
               {submission.caption}
@@ -492,35 +520,32 @@ function MediaAnalysisSection({ analyses }: { analyses: MediaAnalysis[] }) {
 }
 
 function MethodologySection({ report }: { report: VerificationReport }) {
+  const { t } = useLocale();
   return (
     <section aria-labelledby="method-heading">
-      <SectionHeading id="method-heading" title="How this was checked" />
+      <SectionHeading id="method-heading" title={t("howChecked")} />
       <div className="mt-5 space-y-4 text-sm leading-relaxed text-muted">
         <p>
-          We break a submission into individually checkable claims, search our
-          indexed sources for relevant passages, label each passage as
-          supporting or contradicting, and compute the verdict with a fixed,
-          published formula. The language model never decides the verdict.
+          {t("methodBody")}
         </p>
         <p>
-          Republished copies of one report are grouped and counted as a single
-          source, so widespread repetition does not raise confidence on its own.
+          {t("methodDedup")}
         </p>
         <dl className="grid gap-x-6 gap-y-2 border-t border-rule pt-4 sm:grid-cols-2">
           <div className="flex justify-between gap-4">
-            <dt>Checked</dt>
+            <dt>{t("checkedOn")}</dt>
             <dd className="tabular-nums">{formatDate(report.created_at)}</dd>
           </div>
           <div className="flex justify-between gap-4">
-            <dt>Scoring version</dt>
+            <dt>{t("scoringVersion")}</dt>
             <dd className="tabular-nums">{report.scoring_version}</dd>
           </div>
           <div className="flex justify-between gap-4">
-            <dt>Pipeline version</dt>
+            <dt>{t("pipelineVersion")}</dt>
             <dd className="tabular-nums">{report.pipeline_version}</dd>
           </div>
           <div className="flex justify-between gap-4">
-            <dt>Retrieval version</dt>
+            <dt>{t("retrievalVersion")}</dt>
             <dd className="tabular-nums">{report.retrieval_version}</dd>
           </div>
         </dl>

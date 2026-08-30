@@ -2,8 +2,10 @@
 
 import { Check, Link2 } from "lucide-react";
 import { useState } from "react";
+import { useLocale } from "./locale-provider";
 
 export function ShareButton({ publicId }: { publicId: string }) {
+  const { t } = useLocale();
   const [copied, setCopied] = useState(false);
 
   async function copy() {
@@ -28,12 +30,12 @@ export function ShareButton({ publicId }: { publicId: string }) {
       {copied ? (
         <>
           <Check className="h-4 w-4" aria-hidden="true" />
-          Link copied
+          {t("linkCopied")}
         </>
       ) : (
         <>
           <Link2 className="h-4 w-4" aria-hidden="true" />
-          Copy link to this result
+          {t("copyLink")}
         </>
       )}
     </button>

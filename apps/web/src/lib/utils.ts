@@ -10,14 +10,24 @@ export function formatDate(iso: string | null | undefined): string {
   if (!iso) return "Unknown date";
   const date = new Date(iso);
   if (Number.isNaN(date.getTime())) return "Unknown date";
-  return date.toLocaleDateString(undefined, {
+  // Fixed locale and UTC on purpose. toLocaleDateString() with the default
+  // locale resolves differently on the server than in the browser, which
+  // produces a hydration mismatch and makes React discard the tree.
+  return date.toLocaleDateString("en-GB", {
     year: "numeric",
     month: "short",
     day: "numeric",
+    timeZone: "UTC",
   });
 }
 
-/** Relative time for recency, falling back to an absolute date when older. */
+/**
+ * Relative time for recency, falling back to an absolute date when older.
+ *
+ * Depends on the current clock, so server and client disagree by the time the
+ * page reaches the browser. Only call this from a client component after mount
+ * (see `useRelativeTime`), never during SSR.
+ */
 export function formatRelative(iso: string | null | undefined): string {
   if (!iso) return "";
   const date = new Date(iso);

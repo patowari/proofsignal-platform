@@ -20,7 +20,8 @@ import {
 import type { Stage, VerificationStatusResponse } from "@/lib/api/schemas";
 import { getStatus } from "@/lib/api/client";
 import { cn } from "@/lib/utils";
-import { degradationLabel } from "@/lib/verdict";
+import { degradationCopy } from "@/lib/i18n";
+import { useLocale } from "./locale-provider";
 
 export function ProgressView({
   publicId,
@@ -31,6 +32,7 @@ export function ProgressView({
   initialStatus?: VerificationStatusResponse;
   onComplete?: () => void;
 }) {
+  const { locale, t } = useLocale();
   const [waitingLong, setWaitingLong] = useState(false);
 
   useEffect(() => {
@@ -79,19 +81,19 @@ export function ProgressView({
         <div className="flex items-baseline justify-between gap-4">
           <h2 className="font-serif text-xl font-semibold">
             {data.status === "FAILED"
-              ? "This check could not be completed"
-              : "Checking this submission"}
+              ? t("couldNotComplete")
+              : t("checkingSubmission")}
           </h2>
           <span className="text-sm tabular-nums text-muted">
-            {data.stage_index} of {data.stage_count}
+            {data.stage_index} {t("ofSteps")} {data.stage_count}
           </span>
         </div>
         <p className="mt-1 text-sm text-muted">
           {data.status === "FAILED"
-            ? "We stopped before reaching a result. Details below."
+            ? t("failedBody")
             : data.status === "QUEUED"
-              ? "Your check is queued and will begin as soon as the verification worker is available."
-              : "Each step below reflects real progress on our side."}
+              ? t("queuedSubtitle")
+              : t("checkingSubtitle")}
         </p>
       </div>
 
@@ -144,11 +146,11 @@ export function ProgressView({
 
       {data.degradation_reasons.length > 0 ? (
         <div className="rounded-lg border border-amber-300 bg-amber-50 p-5 text-sm dark:border-amber-900 dark:bg-amber-950/30">
-          <h3 className="font-semibold">Limitations in this run</h3>
+          <h3 className="font-semibold">{t("limitationsHeading")}</h3>
           <ul className="mt-2 space-y-1.5">
             {data.degradation_reasons.map((reason) => (
               <li key={reason} className="leading-relaxed opacity-90">
-                {degradationLabel(reason)}
+                {degradationCopy(reason, locale)}
               </li>
             ))}
           </ul>

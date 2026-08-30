@@ -1,3 +1,5 @@
+"use client";
+
 /**
  * Verdict presentation components.
  *
@@ -18,13 +20,10 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import type { ConfidenceBand, Verdict } from "@/lib/api/schemas";
+import { confidenceCopy, verdictCopy } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
-import {
-  CONFIDENCE_LABEL,
-  CONFIDENCE_MEANING,
-  CONFIDENCE_STEPS,
-  verdictPresentation,
-} from "@/lib/verdict";
+import { CONFIDENCE_STEPS, verdictPresentation } from "@/lib/verdict";
+import { useLocale } from "./locale-provider";
 
 const ICONS: Record<string, LucideIcon> = {
   "check-circle": CheckCircle2,
@@ -46,7 +45,9 @@ export function VerdictBanner({
   confidence?: ConfidenceBand | null;
   className?: string;
 }) {
+  const { locale, t } = useLocale();
   const presentation = verdictPresentation(verdict);
+  const copy = verdictCopy(verdict, locale);
   const Icon = ICONS[presentation.icon] ?? CircleHelp;
 
   return (
@@ -58,16 +59,16 @@ export function VerdictBanner({
         <Icon className="mt-1 h-8 w-8 shrink-0" aria-hidden="true" />
         <div className="min-w-0">
           <p className="text-xs font-medium uppercase tracking-widest opacity-70">
-            Overall verdict
+            {t("overallVerdict")}
           </p>
           <h2
             id="verdict-heading"
             className="mt-1 font-serif text-3xl font-semibold sm:text-4xl"
           >
-            {presentation.label}
+            {copy.label}
           </h2>
           <p className="mt-3 max-w-2xl text-sm leading-relaxed opacity-90">
-            {presentation.meaning}
+            {copy.meaning}
           </p>
           {confidence ? (
             <div className="mt-5">
@@ -93,6 +94,8 @@ export function ConfidenceMeter({
   band: ConfidenceBand;
   className?: string;
 }) {
+  const { locale } = useLocale();
+  const copy = confidenceCopy(band, locale);
   const filled = CONFIDENCE_STEPS[band];
 
   return (
@@ -101,7 +104,7 @@ export function ConfidenceMeter({
         <div
           className="flex gap-1"
           role="img"
-          aria-label={`${CONFIDENCE_LABEL[band]}: ${filled} of 3`}
+          aria-label={`${copy.label}: ${filled} / 3`}
         >
           {[1, 2, 3].map((step) => (
             <span
@@ -113,9 +116,9 @@ export function ConfidenceMeter({
             />
           ))}
         </div>
-        <span className="text-sm font-medium">{CONFIDENCE_LABEL[band]}</span>
+        <span className="text-sm font-medium">{copy.label}</span>
       </div>
-      <p className="mt-1.5 text-xs opacity-75">{CONFIDENCE_MEANING[band]}</p>
+      <p className="mt-1.5 text-xs opacity-75">{copy.meaning}</p>
     </div>
   );
 }
@@ -129,7 +132,9 @@ export function VerdictBadge({
   size?: "default" | "small";
   className?: string;
 }) {
+  const { locale } = useLocale();
   const presentation = verdictPresentation(verdict);
+  const copy = verdictCopy(verdict, locale);
   const Icon = ICONS[presentation.icon] ?? CircleHelp;
 
   return (
@@ -145,7 +150,7 @@ export function VerdictBadge({
         className={size === "small" ? "h-3 w-3" : "h-3.5 w-3.5"}
         aria-hidden="true"
       />
-      {presentation.label}
+      {copy.label}
     </span>
   );
 }

@@ -13,6 +13,8 @@
     "Segoe UI", sans-serif;
   --font-serif: var(--font-source-serif), Georgia, Cambria, "Times New Roman",
     serif;
+  --font-bengali-stack: var(--font-bengali), "Noto Sans Bengali", "Nirmala UI",
+    sans-serif;
 
   /* Warm off-white ground: easier on the eye than pure white for long reading. */
   --color-paper: #fbfaf8;
@@ -34,6 +36,26 @@
 }
 
 @layer base {
+  /* Bengali glyphs are absent from Inter and Source Serif, so Bangla would fall
+     back to whatever the OS provides and look inconsistent. Applied by document
+     language rather than per element, so it also covers Bangla content rendered
+     inside an English page. */
+  html[lang="bn"] body,
+  html[lang="bn"] h1,
+  html[lang="bn"] h2,
+  html[lang="bn"] h3,
+  [lang="bn"] {
+    font-family: var(--font-bengali-stack);
+  }
+
+  /* Bengali sits lower and taller than Latin; a little extra leading keeps
+     conjuncts and matras from colliding between lines. */
+  html[lang="bn"] p,
+  html[lang="bn"] li,
+  [lang="bn"] {
+    line-height: 1.85;
+  }
+
   body {
     background: var(--background);
     color: var(--foreground);

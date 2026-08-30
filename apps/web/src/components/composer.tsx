@@ -17,14 +17,15 @@ import {
   submitVideo,
 } from "@/lib/api/client";
 import { cn, formatBytes } from "@/lib/utils";
+import { useLocale } from "./locale-provider";
 
 type Mode = "text" | "url" | "image" | "video";
 
-const MODES: { id: Mode; label: string; icon: typeof Type }[] = [
-  { id: "text", label: "Text", icon: Type },
-  { id: "url", label: "Link", icon: Link2 },
-  { id: "image", label: "Image", icon: ImageIcon },
-  { id: "video", label: "Video", icon: FileVideo },
+const MODES: { id: Mode; labelKey: "tabText" | "tabLink" | "tabImage" | "tabVideo"; icon: typeof Type }[] = [
+  { id: "text", labelKey: "tabText", icon: Type },
+  { id: "url", labelKey: "tabLink", icon: Link2 },
+  { id: "image", labelKey: "tabImage", icon: ImageIcon },
+  { id: "video", labelKey: "tabVideo", icon: FileVideo },
 ];
 
 // Mirrors the backend caps. The server is authoritative; these exist to fail
@@ -40,6 +41,7 @@ const PLACEHOLDERS: Record<Mode, string> = {
 };
 
 export function Composer() {
+  const { t } = useLocale();
   const router = useRouter();
   const [mode, setMode] = useState<Mode>("text");
   const [text, setText] = useState("");
@@ -95,8 +97,8 @@ export function Composer() {
     if (!isMedia && text.trim().length < 10) {
       setError(
         mode === "url"
-          ? "Enter the full link, including https://"
-          : "Enter at least a sentence so we have something to check.",
+          ? t("errorNeedUrl")
+          : t("errorTooShort"),
       );
       return;
     }
@@ -119,11 +121,11 @@ export function Composer() {
       if (caught instanceof ApiError) {
         setError(
           caught.isRateLimited
-            ? "You have made several submissions recently. Please wait a little before trying again."
+            ? t("errorRateLimited")
             : caught.message,
         );
       } else {
-        setError("Something went wrong submitting this. Please try again.");
+        setError(t("errorGeneric"));
       }
       setSubmitting(false);
     }
@@ -138,7 +140,7 @@ export function Composer() {
           aria-label="What do you want to verify?"
           className="grid grid-cols-4 border-b border-rule"
         >
-          {MODES.map(({ id, label, icon: Icon }) => (
+          {MODES.map(({ id, labelKey, icon: Icon }) => (
             <button
               key={id}
               type="button"
@@ -154,7 +156,7 @@ export function Composer() {
               )}
             >
               <Icon className="h-4 w-4" aria-hidden="true" />
-              {label}
+              {t(labelKey)}
             </button>
           ))}
         </div>
@@ -188,7 +190,9 @@ export function Composer() {
                 />
               )}
               <div className="mt-2 flex items-center justify-between gap-3 text-xs text-muted">
-                <span>{mode === "url" ? "Paste the complete public URL." : "Bangla and English are supported."}</span>
+                <span>
+                  {mode === "url" ? t("pasteFullUrl") : t("bothLanguages")}
+                </span>
                 {mode === "text" ? <span className="tabular-nums">{text.length.toLocaleString()} / 50,000</span> : null}
               </div>
             </>
@@ -211,8 +215,8 @@ export function Composer() {
           <p className="flex items-center gap-1.5 text-xs text-muted">
             <ShieldCheck className="h-3.5 w-3.5 text-[var(--green)]" aria-hidden="true" />
             {mode === "text" || mode === "url"
-              ? "No account needed. Results are public."
-              : `Up to ${formatBytes(maxBytes)}. Results are public.`}
+              ? t("noAccountNeeded")
+              : `${formatBytes(maxBytes)} — ${t("noAccountNeeded")}`}
           </p>
           <button
             type="submit"
@@ -222,10 +226,10 @@ export function Composer() {
             {submitting ? (
               <>
                 <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
-                Submitting…
+                {t("verifying")}
               </>
             ) : (
-              <><span>Check this claim</span><ArrowRight className="h-4 w-4" aria-hidden="true" /></>
+              <><span>{t("checkThisClaim")}</span><ArrowRight className="h-4 w-4" aria-hidden="true" /></>
             )}
           </button>
         </div>

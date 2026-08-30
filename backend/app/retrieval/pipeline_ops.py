@@ -14,6 +14,7 @@ from urllib.parse import urlparse
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from app.ai.llm import LLMProvider
 from app.core.config import get_settings
 from app.core.enums import EvidenceRelationship, SourceType
 from app.core.logging import get_logger
@@ -21,7 +22,7 @@ from app.core.versions import CLASSIFIER_VERSION
 from app.models import Evidence, EvidenceCluster, RetrievedDocument, Source
 from app.retrieval.article import fetch_article
 from app.retrieval.base import RetrievedItem
-from app.retrieval.evidence import extract_evidence_for_claim
+from app.retrieval.evidence import ExtractedEvidence, extract_evidence_for_claim
 from app.retrieval.feeds import RSSFeedProvider, is_primary_source_domain
 
 logger = get_logger(__name__)
@@ -356,3 +357,44 @@ def signals_from_evidence(
             )
         )
     return signals
+
+
+def _reclassify_with_llm(
+    llm: LLMProvider,
+    claim_text: str,
+    passages: list[ExtractedEvidence],
+    language: str,
+) -> list[ExtractedEvidence]:
+    """Re-label lexically-selected passages using the LLM.
+
+    Retrieval still selects *which* passages are candidates -- that is cheap and
+    deterministic. The model only decides the relationship, which is the part
+    lexical rules get wrong across paraphrase and across languages.
+
+    Any failure keeps the lexical label, so a slow or absent model degrades
+    quality rather than losing the evidence.
+    """
+    from app.ai.classifier import CLASSIFIER_NAME, classify_with_llm
+
+    updated = []
+    for passage in passages:
+        try:
+            result = run_async(
+                classify_with_llm(llm, claim_text, passage.passage, language=language)
+            )
+        except Exception as exc:
+            logger.warning("classifier.failed", error_type=type(exc).__name__)
+            result = None
+
+        if result is None:
+            updated.append(passage)
+            continue
+
+        passage.relationship = result.relationship
+        passage.directness = result.directness
+        passage.rationale = result.reason
+        passage.confidence = result.confidence
+        passage.classifier = CLASSIFIER_NAME
+        updated.append(passage)
+
+    return updated

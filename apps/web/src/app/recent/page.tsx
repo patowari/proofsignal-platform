@@ -35,7 +35,7 @@ export default async function RecentPage() {
           </p>
         ) : (
           <RecentList
-            heading="All verifications"
+            headingKey="recentlyChecked"
             items={items}
             emptyMessage="Nothing has been verified yet."
           />

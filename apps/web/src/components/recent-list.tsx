@@ -1,7 +1,11 @@
+"use client";
+
 import { ArrowUpRight, FileVideo, Image as ImageIcon, Link2, Loader2, Type } from "lucide-react";
 import Link from "next/link";
 import type { RecentVerification, SubmissionType } from "@/lib/api/schemas";
-import { formatRelative } from "@/lib/utils";
+import { useEffect, useState } from "react";
+import { formatDate, formatRelative } from "@/lib/utils";
+import { useLocale } from "./locale-provider";
 import { VerdictBadge } from "./verdict-display";
 
 const TYPE_ICONS: Record<SubmissionType, typeof Type> = {
@@ -31,20 +35,25 @@ export function RecentList({
   description,
   items,
   emptyMessage,
+  headingKey,
 }: {
-  heading: string;
+  heading?: string;
   description?: string;
   items: RecentVerification[];
   emptyMessage?: string;
+  /** Preferred over `heading`: resolves through the active locale. */
+  headingKey?: "recentlyChecked" | "inProgress";
 }) {
+  const { t } = useLocale();
+  const title = headingKey ? t(headingKey) : (heading ?? "");
   return (
-    <section aria-labelledby={`heading-${heading.replace(/\s+/g, "-").toLowerCase()}`}>
+    <section aria-labelledby={`heading-${title.replace(/\s+/g, "-").toLowerCase()}`}>
       <div className="flex items-baseline justify-between gap-4 border-b border-rule pb-3">
         <h2
-          id={`heading-${heading.replace(/\s+/g, "-").toLowerCase()}`}
+          id={`heading-${title.replace(/\s+/g, "-").toLowerCase()}`}
           className="font-serif text-xl font-semibold"
         >
-          {heading}
+          {title}
         </h2>
         {description ? (
           <p className="hidden text-sm text-muted sm:block">{description}</p>
@@ -53,7 +62,7 @@ export function RecentList({
 
       {items.length === 0 ? (
         <p className="py-8 text-sm text-muted">
-          {emptyMessage ?? "Nothing here yet."}
+          {emptyMessage ?? t("emptyRecent")}
         </p>
       ) : (
         <ul className="mt-4 grid gap-3">
@@ -68,7 +77,23 @@ export function RecentList({
   );
 }
 
+/**
+ * Relative time, computed only after mount.
+ *
+ * "3m ago" depends on the current clock, so rendering it during SSR guarantees
+ * a hydration mismatch. The absolute date is shown first, then upgraded.
+ */
+function useRelativeTime(iso: string): string {
+  const [label, setLabel] = useState(() => formatDate(iso));
+  useEffect(() => {
+    setLabel(formatRelative(iso));
+  }, [iso]);
+  return label;
+}
+
 function VerificationRow({ item }: { item: RecentVerification }) {
+  const { locale } = useLocale();
+  const relative = useRelativeTime(item.created_at);
   const Icon = TYPE_ICONS[item.content_type] ?? Type;
   const isRunning = item.status === "QUEUED" || item.status === "RUNNING";
   const summary = item.title || item.excerpt || "Untitled submission";
@@ -91,7 +116,7 @@ function VerificationRow({ item }: { item: RecentVerification }) {
           <span>{TYPE_LABELS[item.content_type]}</span>
           <span aria-hidden="true">·</span>
           <time dateTime={item.created_at}>
-            {formatRelative(item.created_at)}
+            {relative}
           </time>
         </div>
       </div>
@@ -100,13 +125,13 @@ function VerificationRow({ item }: { item: RecentVerification }) {
         {isRunning ? (
           <span className="inline-flex items-center gap-1.5 rounded-full border border-rule px-2.5 py-1 text-xs text-muted">
             <Loader2 className="h-3 w-3 animate-spin" aria-hidden="true" />
-            Checking
+            {locale === "bn" ? "যাচাই চলছে" : "Checking"}
           </span>
         ) : item.status === "FAILED" ? (
           // A processing failure is shown as a failure, never as a verdict
           // about the claim.
           <span className="inline-flex items-center rounded-full border border-rule px-2.5 py-1 text-xs text-muted">
-            Could not check
+            {locale === "bn" ? "যাচাই করা যায়নি" : "Could not check"}
           </span>
         ) : (
           <VerdictBadge verdict={item.overall_verdict} size="small" />

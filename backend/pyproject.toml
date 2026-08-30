@@ -75,6 +75,11 @@ ignore = ["E501", "B008", "S101"]
 "tests/test_untrusted.py" = ["S", "N806", "RUF001", "RUF003"]
 "tests/test_url_validation.py" = ["S", "N806", "RUF001", "RUF003"]
 "alembic/*" = ["N999", "F401"]
+# Entrypoints must set the asyncio loop policy before importing anything that
+# creates a loop or a database connection, so imports cannot come first.
+"app/main.py" = ["E402"]
+"app/workers/worker.py" = ["E402"]
+"run_api.py" = ["E402"]
 
 [tool.mypy]
 python_version = "3.12"

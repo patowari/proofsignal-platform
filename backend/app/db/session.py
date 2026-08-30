@@ -34,6 +34,14 @@ def _async_url(url: str) -> str:
 
 @lru_cache
 def get_async_engine() -> AsyncEngine:
+    # The loop policy must be right before the first connection is made. Setting
+    # it here as well as in entrypoints means an embedder that constructs its
+    # own loop (uvicorn, pytest-asyncio) still gets a working engine rather than
+    # an InterfaceError on first query.
+    from app.core.runtime import configure_event_loop
+
+    configure_event_loop()
+
     settings = get_settings()
     return create_async_engine(
         _async_url(settings.database_url),

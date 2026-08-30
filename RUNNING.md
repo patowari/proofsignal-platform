@@ -4,13 +4,13 @@ Everything below was executed on the development machine. Ports are
 deliberately non-default because 5432, 6379, 9000, and 8000 were already taken
 by other stacks.
 
-| Service | Port | Why this port |
-|---|---|---|
-| PostgreSQL + pgvector | **55432** | 5432 taken by another project |
-| Redis | **56379** | 6379 taken |
-| MinIO API / console | **59000** / 59001 | 9000 taken |
-| Backend API | **8123** | 8000 taken |
-| Frontend | **3100** | 3000 taken |
+| Service               | Port                    | Why this port                 |
+| --------------------- | ----------------------- | ----------------------------- |
+| PostgreSQL + pgvector | **55432**         | 5432 taken by another project |
+| Redis                 | **56379**         | 6379 taken                    |
+| MinIO API / console   | **59000** / 59001 | 9000 taken                    |
+| Backend API           | **8123**          | 8000 taken                    |
+| Frontend              | **3100**          | 3000 taken                    |
 
 ---
 
@@ -105,7 +105,7 @@ Then open **http://localhost:3100**.
 2. Paste something with checkable facts, e.g.
 
    > A 7.8 magnitude earthquake hit Japan today, killing 500 people and causing a tsunami. The government approved $50 billion in emergency aid.
-
+   >
 3. Press **Verify**. You land on `/verify/vfy_…` and watch the real stages
    advance — each line is a database row written by the worker, not an
    animation.
@@ -241,8 +241,7 @@ start http://localhost:59001      # PowerShell;  use `open` on macOS
 ## Troubleshooting
 
 **Submissions stay QUEUED.** The worker is not running — start Terminal 3.
-Check the queue with `docker exec verifier-redis redis-cli LLEN
-queue:verification:pending`; a growing number confirms it.
+Check the queue with `docker exec verifier-redis redis-cli LLEN queue:verification:pending`; a growing number confirms it.
 
 **`InterfaceError` on every database call.** You started the API with `uvicorn`
 directly. Use `python run_api.py` — see Terminal 2 above.
@@ -262,6 +261,24 @@ reported as unavailable rather than as "no text found".
 **`The token '&&' is not a valid statement separator in this version.`** You are
 on Windows PowerShell 5.1, which has no `&&`. Use `;` instead, or run the two
 commands on separate lines.
+
+**`[Errno 10048] ... only one usage of each socket address`** on startup. A
+previous API or worker is still running and holding the port. Stop every process
+belonging to this project, then start again:
+
+```powershell
+Get-CimInstance Win32_Process |
+  Where-Object { $_.CommandLine -like "*Fake-News-Detector*" -and $_.Name -like "python*" } |
+  ForEach-Object { Stop-Process -Id $_.ProcessId -Force }
+```
+
+To see what is running before killing anything:
+
+```powershell
+Get-CimInstance Win32_Process |
+  Where-Object { $_.CommandLine -like "*Fake-News-Detector*" -and $_.Name -like "python*" } |
+  Select-Object ProcessId, CommandLine
+```
 
 **Docker daemon not reachable.** Start Docker Desktop and wait for the engine —
 `docker version` should print a Server section.

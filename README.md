@@ -123,6 +123,9 @@ the report — never a crash, and never a wrong verdict.
 
 ---
 
+> **Want to run and test it now?** See **[RUNNING.md](RUNNING.md)** for the
+> four-terminal startup, browser walkthrough, and Postman collection.
+
 ## Setup
 
 ### Backend

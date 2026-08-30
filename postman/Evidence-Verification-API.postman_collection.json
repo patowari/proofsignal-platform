@@ -1,0 +1,569 @@
+{
+  "info": {
+    "name": "Evidence Verification API",
+    "description": "Evidence-backed information verification platform.\n\nNo authentication — V1 is anonymously usable by design.\n\n**Setup**\n1. Start services: `docker compose up -d`\n2. Start API: `cd backend && .venv/Scripts/python run_api.py --port 8123`\n3. Start worker: `cd backend && .venv/Scripts/python -m app.workers.worker`\n\nThe worker must be running or submissions stay QUEUED forever.\n\n**Flow**\nSubmit returns a `verification_public_id` immediately (202). The request never\nwaits for verification. Poll `/status` until COMPLETED or FAILED, then GET the\nfull report.\n\nSubmission requests automatically save `verificationId` to a collection\nvariable, so you can run Submit then Status/Report without copying ids.\n\n**Note on current results:** evidence retrieval is not implemented yet, so every\nverification honestly returns UNVERIFIED with degradation reasons. That is the\ncorrect behavior — UNVERIFIED never means FALSE.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://127.0.0.1:8123",
+      "description": "API base URL. Port 8123, not 8000 — 8000 is taken by another stack on the dev machine."
+    },
+    {
+      "key": "verificationId",
+      "value": "",
+      "description": "Auto-populated by any Submit request."
+    },
+    {
+      "key": "submissionId",
+      "value": "",
+      "description": "Auto-populated by any Submit request."
+    }
+  ],
+  "item": [
+    {
+      "name": "Health",
+      "description": "Liveness and dependency readiness.",
+      "item": [
+        {
+          "name": "GET /api/health",
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{baseUrl}}/api/health", "host": ["{{baseUrl}}"], "path": ["api", "health"] },
+            "description": "Liveness only. Does no I/O, so it stays fast and cannot be blocked by a slow dependency."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200 OK', () => pm.response.to.have.status(200));",
+                  "pm.test('reports ok', () => pm.expect(pm.response.json().status).to.eql('ok'));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "GET /api/ready",
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{baseUrl}}/api/ready", "host": ["{{baseUrl}}"], "path": ["api", "ready"] },
+            "description": "Per-dependency readiness.\n\nRequired (PostgreSQL, Redis, object storage) failing => `not_ready`.\nOptional (Ollama, Tesseract) missing => `degraded`, still serving.\n\nExpect `degraded` on a machine without Ollama and Tesseract. That is correct:\nthose features downgrade, they do not break the pipeline."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200 OK', () => pm.response.to.have.status(200));",
+                  "const body = pm.response.json();",
+                  "pm.test('required dependencies are up', () => {",
+                  "  const down = body.dependencies.filter(d => d.required && d.status !== 'ok');",
+                  "  pm.expect(down, JSON.stringify(down)).to.be.empty;",
+                  "});",
+                  "console.log('Status:', body.status);",
+                  "console.log('Degraded capabilities:', body.degraded_capabilities);"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Submissions",
+      "description": "Anonymous submission. All return 202 immediately and enqueue a job.",
+      "item": [
+        {
+          "name": "POST /api/submissions/text",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"text\": \"A 7.8 magnitude earthquake hit Japan today, killing 500 people and causing a tsunami. The government approved $50 billion in emergency aid.\",\n  \"title\": \"Japan earthquake report\"\n}"
+            },
+            "url": { "raw": "{{baseUrl}}/api/submissions/text", "host": ["{{baseUrl}}"], "path": ["api", "submissions", "text"] },
+            "description": "Submit written text.\n\nThis example decomposes into multiple atomic claims — the earthquake event and\nthe aid figure are checked separately, because a piece can be mostly accurate\nwhile one detail is wrong.\n\nMin 10 characters, max 50,000."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('202 Accepted', () => pm.response.to.have.status(202));",
+                  "const body = pm.response.json();",
+                  "pm.test('returns opaque ids', () => {",
+                  "  pm.expect(body.verification_public_id).to.match(/^vfy_/);",
+                  "  pm.expect(body.submission_public_id).to.match(/^sub_/);",
+                  "});",
+                  "pm.test('queued, not processed synchronously', () => {",
+                  "  pm.expect(body.status).to.eql('QUEUED');",
+                  "});",
+                  "pm.collectionVariables.set('verificationId', body.verification_public_id);",
+                  "pm.collectionVariables.set('submissionId', body.submission_public_id);",
+                  "console.log('Saved verificationId:', body.verification_public_id);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "POST /api/submissions/text (Bangla)",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"text\": \"আজ বাংলাদেশে ৮.৫ মাত্রার ভূমিকম্প হয়েছে। সরকার জানিয়েছে ৫০০ জন নিহত হয়েছেন।\"\n}"
+            },
+            "url": { "raw": "{{baseUrl}}/api/submissions/text", "host": ["{{baseUrl}}"], "path": ["api", "submissions", "text"] },
+            "description": "Bangla text.\n\nLanguage is detected from script, the danda (।) splits sentences, and Bengali\ndigits are normalized to Arabic numerals so numeric comparison works across\nscripts. The original text is never translated away."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('202 Accepted', () => pm.response.to.have.status(202));",
+                  "pm.collectionVariables.set('verificationId', pm.response.json().verification_public_id);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "POST /api/submissions/url",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"url\": \"https://example.com/news/article-123\",\n  \"note\": \"Seen shared widely today\"\n}"
+            },
+            "url": { "raw": "{{baseUrl}}/api/submissions/url", "host": ["{{baseUrl}}"], "path": ["api", "submissions", "url"] },
+            "description": "Submit an article or public social URL.\n\nThe URL passes SSRF validation here; the worker re-validates before fetching,\nbecause DNS can change in between."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('202 Accepted', () => pm.response.to.have.status(202));",
+                  "pm.collectionVariables.set('verificationId', pm.response.json().verification_public_id);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "POST /api/submissions/image",
+          "request": {
+            "method": "POST",
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                { "key": "file", "type": "file", "src": [], "description": "Pick a JPEG/PNG/GIF/WebP. Max 15 MB." },
+                { "key": "caption", "value": "Flooding in Dhaka today", "type": "text", "description": "Verified as its own claim — an authentic photo can carry a false caption." },
+                { "key": "is_screenshot", "value": "false", "type": "text", "description": "true routes to screenshot handling (OCR the visible text)." }
+              ]
+            },
+            "url": { "raw": "{{baseUrl}}/api/submissions/image", "host": ["{{baseUrl}}"], "path": ["api", "submissions", "image"] },
+            "description": "Upload an image.\n\n**Select a file in the Body tab before sending.**\n\nValidation: declared MIME and magic bytes must agree, decompression bombs are\ncapped before decode, and the storage key is generated from a UUID — the\nuploaded filename never becomes a path."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.response.code === 202) {",
+                  "  pm.collectionVariables.set('verificationId', pm.response.json().verification_public_id);",
+                  "} else {",
+                  "  console.log('Did you select a file in the Body tab?', pm.response.text());",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "POST /api/submissions/video",
+          "request": {
+            "method": "POST",
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                { "key": "file", "type": "file", "src": [], "description": "MP4/MOV/WebM/MKV. Max 200 MB." },
+                { "key": "caption", "value": "", "type": "text" }
+              ]
+            },
+            "url": { "raw": "{{baseUrl}}/api/submissions/video", "host": ["{{baseUrl}}"], "path": ["api", "submissions", "video"] },
+            "description": "Upload a video.\n\nRate limited to 3 per hour — video is the most expensive submission type.\nDuration and resolution are checked by ffprobe before any transcoding."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.response.code === 202) {",
+                  "  pm.collectionVariables.set('verificationId', pm.response.json().verification_public_id);",
+                  "}"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Verifications",
+      "description": "Read a verification. Uses {{verificationId}} from the last submit.",
+      "item": [
+        {
+          "name": "GET /status (poll this)",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/api/verifications/{{verificationId}}/status",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "verifications", "{{verificationId}}", "status"]
+            },
+            "description": "Live progress — the cheap endpoint the UI polls.\n\nEvery stage listed is a real database row written by the worker. There is no\nsimulated sequence: if the worker stalls, this stops advancing.\n\nSend repeatedly until `status` is COMPLETED or FAILED."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200 OK', () => pm.response.to.have.status(200));",
+                  "const body = pm.response.json();",
+                  "console.log(`${body.status} — ${body.stage_index}/${body.stage_count} — ${body.current_stage_label}`);",
+                  "body.stages.forEach(s => console.log(`  ${s.status.padEnd(10)} ${s.label}`));",
+                  "if (body.degradation_reasons.length) {",
+                  "  console.log('Degraded:', body.degradation_reasons.join(', '));",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "GET /verifications/{id} (full report)",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/api/verifications/{{verificationId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "verifications", "{{verificationId}}"]
+            },
+            "description": "The full report: verdict, confidence band, claims, evidence, media analysis,\ndegradation notes, and version stamps.\n\n`confidence_score` is present for debugging but the UI never renders it — the\nband is what users see, because the numeric score is uncalibrated."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200 OK', () => pm.response.to.have.status(200));",
+                  "const body = pm.response.json();",
+                  "",
+                  "pm.test('a failed run never yields a substantive verdict', () => {",
+                  "  if (body.status === 'FAILED') {",
+                  "    pm.expect(body.overall_verdict, 'a technical failure must not read as FALSE').to.be.null;",
+                  "  }",
+                  "});",
+                  "",
+                  "pm.test('no evidence means UNVERIFIED, never FALSE', () => {",
+                  "  if (body.status === 'COMPLETED' && body.total_evidence === 0) {",
+                  "    pm.expect(body.overall_verdict).to.eql('UNVERIFIED');",
+                  "  }",
+                  "});",
+                  "",
+                  "console.log('Verdict:', body.overall_verdict, '/', body.confidence_band);",
+                  "console.log('Summary:', body.summary);",
+                  "console.log(`Claims: ${body.claims.length}, evidence: ${body.total_evidence}, origins: ${body.independent_origins}`);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "GET /claims",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/api/verifications/{{verificationId}}/claims",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "verifications", "{{verificationId}}", "claims"]
+            },
+            "description": "Atomic claims with per-claim verdicts.\n\n`origin` matters: USER_CAPTION claims are checked separately from\nVIDEO_TRANSCRIPT claims, because an authentic video can carry a false caption.\n\n`independent_origins` counts distinct sources after clustering — 50 syndicated\ncopies of one wire story count as 1."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200 OK', () => pm.response.to.have.status(200));",
+                  "pm.response.json().forEach((c, i) => {",
+                  "  console.log(`Claim ${i + 1} [${c.verdict}] ${c.claim_type} imp=${c.importance}`);",
+                  "  console.log(`  ${c.claim_text}`);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "GET /evidence",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/api/verifications/{{verificationId}}/evidence",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "verifications", "{{verificationId}}", "evidence"],
+              "query": [
+                { "key": "relationship", "value": "CONTRADICTS", "disabled": true, "description": "SUPPORTS | CONTRADICTS | NEUTRAL | INSUFFICIENT" }
+              ]
+            },
+            "description": "Evidence passages, optionally filtered.\n\nContradicting evidence is always available regardless of the overall verdict —\nhiding it would defeat the point of the product.\n\nCurrently empty: retrieval is not implemented yet, and we never invent evidence\nto fill the gap."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200 OK', () => pm.response.to.have.status(200));",
+                  "console.log('Evidence items:', pm.response.json().length);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "GET /api/recent",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/api/recent?limit=20",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "recent"],
+              "query": [
+                { "key": "limit", "value": "20" },
+                { "key": "verdict", "value": "UNVERIFIED", "disabled": true },
+                { "key": "status", "value": "COMPLETED", "disabled": true }
+              ]
+            },
+            "description": "Recent public verifications, newest first. Real records only — an empty list\nmeans nothing has been submitted yet."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200 OK', () => pm.response.to.have.status(200));",
+                  "const body = pm.response.json();",
+                  "console.log(`${body.items.length} shown of ${body.total} total`);",
+                  "body.items.forEach(i => console.log(`  ${i.public_id} ${i.status} ${i.overall_verdict ?? ''}`));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Security checks",
+      "description": "These SHOULD fail. Each asserts a protection is working.\n\nRun the whole folder — every request expects a rejection.",
+      "item": [
+        {
+          "name": "SSRF: localhost (expect 400)",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"url\": \"http://127.0.0.1/admin\"\n}" },
+            "url": { "raw": "{{baseUrl}}/api/submissions/url", "host": ["{{baseUrl}}"], "path": ["api", "submissions", "url"] },
+            "description": "Loopback must be refused: otherwise our server becomes a proxy into its own network."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('rejected with 400', () => pm.response.to.have.status(400));",
+                  "pm.test('error code is UNSAFE_URL', () => {",
+                  "  pm.expect(pm.response.json().error.code).to.eql('UNSAFE_URL');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "SSRF: cloud metadata (expect 400)",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"url\": \"http://169.254.169.254/latest/meta-data/iam/security-credentials/\"\n}" },
+            "url": { "raw": "{{baseUrl}}/api/submissions/url", "host": ["{{baseUrl}}"], "path": ["api", "submissions", "url"] },
+            "description": "The highest-value SSRF target in any cloud deployment: instance credentials."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('rejected with 400', () => pm.response.to.have.status(400));",
+                  "pm.test('does not disclose which range was hit', () => {",
+                  "  const msg = pm.response.json().error.message;",
+                  "  pm.expect(msg).to.not.include('169.254');",
+                  "  pm.expect(msg.toLowerCase()).to.not.include('metadata');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "SSRF: obfuscated loopback (expect 400)",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"url\": \"http://2130706433/\"\n}" },
+            "url": { "raw": "{{baseUrl}}/api/submissions/url", "host": ["{{baseUrl}}"], "path": ["api", "submissions", "url"] },
+            "description": "2130706433 is decimal for 127.0.0.1. Naive string checks miss this; we decode\ndecimal, hex, octal, short-form, and IPv4-mapped IPv6 before checking."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": ["pm.test('rejected with 400', () => pm.response.to.have.status(400));"]
+              }
+            }
+          ]
+        },
+        {
+          "name": "SSRF: private range (expect 400)",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"url\": \"http://192.168.1.1/\"\n}" },
+            "url": { "raw": "{{baseUrl}}/api/submissions/url", "host": ["{{baseUrl}}"], "path": ["api", "submissions", "url"] }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": { "type": "text/javascript", "exec": ["pm.test('rejected with 400', () => pm.response.to.have.status(400));"] }
+            }
+          ]
+        },
+        {
+          "name": "SSRF: file scheme (expect 400)",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"url\": \"file:///etc/passwd\"\n}" },
+            "url": { "raw": "{{baseUrl}}/api/submissions/url", "host": ["{{baseUrl}}"], "path": ["api", "submissions", "url"] },
+            "description": "Only http and https are allowed. file:, gopher:, dict:, and data: are refused."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": { "type": "text/javascript", "exec": ["pm.test('rejected with 400', () => pm.response.to.have.status(400));"] }
+            }
+          ]
+        },
+        {
+          "name": "SSRF: internal port (expect 400)",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"url\": \"http://example.com:6379/\"\n}" },
+            "url": { "raw": "{{baseUrl}}/api/submissions/url", "host": ["{{baseUrl}}"], "path": ["api", "submissions", "url"] },
+            "description": "Non-standard ports are refused even on a public host: Redis, Postgres and\nfriends are the endpoint of most SSRF chains."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": { "type": "text/javascript", "exec": ["pm.test('rejected with 400', () => pm.response.to.have.status(400));"] }
+            }
+          ]
+        },
+        {
+          "name": "Validation: text too short (expect 422)",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"text\": \"hi\"\n}" },
+            "url": { "raw": "{{baseUrl}}/api/submissions/text", "host": ["{{baseUrl}}"], "path": ["api", "submissions", "text"] }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('rejected with 422', () => pm.response.to.have.status(422));",
+                  "pm.test('uses the standard error envelope', () => {",
+                  "  pm.expect(pm.response.json().error.code).to.eql('VALIDATION_ERROR');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Malformed id (expect 400)",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/api/verifications/not-a-valid-id",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "verifications", "not-a-valid-id"]
+            },
+            "description": "Id shape is validated before it reaches a query."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": { "type": "text/javascript", "exec": ["pm.test('rejected with 400', () => pm.response.to.have.status(400));"] }
+            }
+          ]
+        },
+        {
+          "name": "Unknown id (expect 404)",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/api/verifications/vfy_AAAAAAAAAAAAAAAA",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "verifications", "vfy_AAAAAAAAAAAAAAAA"]
+            },
+            "description": "Well-formed but nonexistent. Public ids carry ~92 bits of entropy, so they\ncannot be enumerated."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": { "type": "text/javascript", "exec": ["pm.test('404 Not Found', () => pm.response.to.have.status(404));"] }
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

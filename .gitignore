@@ -1,0 +1,43 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# Node
+node_modules/
+.next/
+out/
+.turbo/
+*.tsbuildinfo
+coverage/
+playwright-report/
+test-results/
+
+# Environment - never commit real secrets
+.env
+.env.local
+.env.*.local
+!.env.example
+
+# Data and media
+/data/
+/media/
+*.sqlite
+*.db
+
+# Models downloaded at runtime
+/models/
+.cache/
+
+# OS / editor
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/

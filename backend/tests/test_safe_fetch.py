@@ -114,7 +114,8 @@ class TestRedirectSafety:
         )
         respx.get("https://example.com/new").mock(
             return_value=httpx.Response(
-                200, html="<html><body>Article</body></html>",
+                200,
+                html="<html><body>Article</body></html>",
             )
         )
         result = await safe_fetch("https://example.com/old")

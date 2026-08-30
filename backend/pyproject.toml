@@ -70,6 +70,10 @@ ignore = ["E501", "B008", "S101"]
 
 [tool.ruff.lint.per-file-ignores]
 "tests/*" = ["S", "N806"]
+# The injection tests deliberately contain homoglyphs and zero-width characters:
+# those characters ARE the attack under test.
+"tests/test_untrusted.py" = ["S", "N806", "RUF001", "RUF003"]
+"tests/test_url_validation.py" = ["S", "N806", "RUF001", "RUF003"]
 "alembic/*" = ["N999", "F401"]
 
 [tool.mypy]

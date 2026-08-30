@@ -256,7 +256,9 @@ class TestResolvedIPValidation:
         with pytest.raises(UnsafeURLError):
             validate_resolved_ip(ip)
 
-    @pytest.mark.parametrize("ip", ["93.184.216.34", "8.8.8.8", "2606:2800:220:1:248:1893:25c8:1946"])
+    @pytest.mark.parametrize(
+        "ip", ["93.184.216.34", "8.8.8.8", "2606:2800:220:1:248:1893:25c8:1946"]
+    )
     def test_public_resolved_ips_allowed(self, ip: str) -> None:
         validate_resolved_ip(ip)
 
@@ -266,7 +268,9 @@ class TestResolvedIPValidation:
 
 
 class TestMalformedInput:
-    @pytest.mark.parametrize("url", ["", "   ", "not a url", "http://", "https://", "://example.com"])
+    @pytest.mark.parametrize(
+        "url", ["", "   ", "not a url", "http://", "https://", "://example.com"]
+    )
     def test_malformed_rejected(self, url: str) -> None:
         _assert_rejected(url)
 

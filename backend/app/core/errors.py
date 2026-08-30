@@ -148,7 +148,12 @@ class StageFailedError(AppError):
     http_status = 500
 
     def __init__(
-        self, stage: str, message: str, details: dict[str, Any] | None = None, *, transient: bool = False
+        self,
+        stage: str,
+        message: str,
+        details: dict[str, Any] | None = None,
+        *,
+        transient: bool = False,
     ) -> None:
         super().__init__(message, {**(details or {}), "stage": stage})
         self.stage = stage

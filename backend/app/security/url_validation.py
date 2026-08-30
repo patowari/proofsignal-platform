@@ -25,29 +25,29 @@ ALLOWED_SCHEMES = frozenset({"http", "https"})
 #: loopback and private ranges, 169.254.169.254 (cloud instance metadata) is the
 #: highest-value SSRF target in any cloud deployment and lives in link-local.
 _BLOCKED_IPV4 = (
-    ipaddress.ip_network("0.0.0.0/8"),        # "this network"; 0.0.0.0 often reaches localhost
-    ipaddress.ip_network("10.0.0.0/8"),       # RFC1918 private
-    ipaddress.ip_network("100.64.0.0/10"),    # CGNAT
-    ipaddress.ip_network("127.0.0.0/8"),      # loopback
-    ipaddress.ip_network("169.254.0.0/16"),   # link-local, includes cloud metadata
-    ipaddress.ip_network("172.16.0.0/12"),    # RFC1918 private
-    ipaddress.ip_network("192.0.0.0/24"),     # IETF protocol assignments
-    ipaddress.ip_network("192.0.2.0/24"),     # TEST-NET-1
-    ipaddress.ip_network("192.168.0.0/16"),   # RFC1918 private
-    ipaddress.ip_network("198.18.0.0/15"),    # benchmarking
+    ipaddress.ip_network("0.0.0.0/8"),  # "this network"; 0.0.0.0 often reaches localhost
+    ipaddress.ip_network("10.0.0.0/8"),  # RFC1918 private
+    ipaddress.ip_network("100.64.0.0/10"),  # CGNAT
+    ipaddress.ip_network("127.0.0.0/8"),  # loopback
+    ipaddress.ip_network("169.254.0.0/16"),  # link-local, includes cloud metadata
+    ipaddress.ip_network("172.16.0.0/12"),  # RFC1918 private
+    ipaddress.ip_network("192.0.0.0/24"),  # IETF protocol assignments
+    ipaddress.ip_network("192.0.2.0/24"),  # TEST-NET-1
+    ipaddress.ip_network("192.168.0.0/16"),  # RFC1918 private
+    ipaddress.ip_network("198.18.0.0/15"),  # benchmarking
     ipaddress.ip_network("198.51.100.0/24"),  # TEST-NET-2
-    ipaddress.ip_network("203.0.113.0/24"),   # TEST-NET-3
-    ipaddress.ip_network("224.0.0.0/4"),      # multicast
-    ipaddress.ip_network("240.0.0.0/4"),      # reserved, includes broadcast
+    ipaddress.ip_network("203.0.113.0/24"),  # TEST-NET-3
+    ipaddress.ip_network("224.0.0.0/4"),  # multicast
+    ipaddress.ip_network("240.0.0.0/4"),  # reserved, includes broadcast
 )
 
 _BLOCKED_IPV6 = (
-    ipaddress.ip_network("::/128"),           # unspecified
-    ipaddress.ip_network("::1/128"),          # loopback
-    ipaddress.ip_network("fc00::/7"),         # unique local
-    ipaddress.ip_network("fe80::/10"),        # link-local
-    ipaddress.ip_network("ff00::/8"),         # multicast
-    ipaddress.ip_network("2001:db8::/32"),    # documentation
+    ipaddress.ip_network("::/128"),  # unspecified
+    ipaddress.ip_network("::1/128"),  # loopback
+    ipaddress.ip_network("fc00::/7"),  # unique local
+    ipaddress.ip_network("fe80::/10"),  # link-local
+    ipaddress.ip_network("ff00::/8"),  # multicast
+    ipaddress.ip_network("2001:db8::/32"),  # documentation
 )
 
 #: Hostnames that resolve to internal infrastructure in container and

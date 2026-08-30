@@ -24,16 +24,25 @@ job_id_var: ContextVar[str | None] = ContextVar("job_id", default=None)
 #: Keys scrubbed from log output wherever they appear.
 _REDACTED_KEYS = frozenset(
     {
-        "password", "secret", "token", "api_key", "apikey", "authorization",
-        "cookie", "access_key", "secret_key", "minio_secret_key",
-        "client_fingerprint_salt", "ip", "ip_address", "client_ip",
+        "password",
+        "secret",
+        "token",
+        "api_key",
+        "apikey",
+        "authorization",
+        "cookie",
+        "access_key",
+        "secret_key",
+        "minio_secret_key",
+        "client_fingerprint_salt",
+        "ip",
+        "ip_address",
+        "client_ip",
     }
 )
 
 
-def _add_correlation_ids(
-    _logger: Any, _method: str, event_dict: dict[str, Any]
-) -> dict[str, Any]:
+def _add_correlation_ids(_logger: Any, _method: str, event_dict: dict[str, Any]) -> dict[str, Any]:
     for key, var in (
         ("request_id", request_id_var),
         ("verification_id", verification_id_var),

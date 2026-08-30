@@ -238,9 +238,7 @@ async def safe_fetch(
             if not location:
                 raise FetchError("Redirect response had no destination.")
             if hop >= settings.max_redirects:
-                raise FetchError(
-                    "Too many redirects.", {"max_redirects": settings.max_redirects}
-                )
+                raise FetchError("Too many redirects.", {"max_redirects": settings.max_redirects})
             redirect_chain.append(current_url)
             # Resolve relative redirects against the current URL, then loop so
             # the new destination goes through full validation again.

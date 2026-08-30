@@ -38,9 +38,15 @@ from app.models import Submission, Verification, VerificationStage
 logger = get_logger(__name__)
 
 #: Execution order. ANALYZING_MEDIA is skipped when there is no media.
+#:
+#: Media analysis runs BEFORE claim extraction, because OCR turns text inside an
+#: image into claims to verify. Running it later would extract that text and
+#: then have nothing left to do with it -- which is exactly what happened, and
+#: meant an uploaded screenshot could only ever be checked against its caption.
 STAGE_SEQUENCE: tuple[PipelineStage, ...] = (
     PipelineStage.NORMALIZING,
     PipelineStage.EXTRACTING_CONTENT,
+    PipelineStage.ANALYZING_MEDIA,
     PipelineStage.DETECTING_LANGUAGE,
     PipelineStage.EXTRACTING_CLAIMS,
     PipelineStage.GENERATING_QUERIES,
@@ -48,7 +54,6 @@ STAGE_SEQUENCE: tuple[PipelineStage, ...] = (
     PipelineStage.FETCHING_DOCUMENTS,
     PipelineStage.EXTRACTING_EVIDENCE,
     PipelineStage.CLASSIFYING_EVIDENCE,
-    PipelineStage.ANALYZING_MEDIA,
     PipelineStage.SCORING,
     PipelineStage.GENERATING_REPORT,
 )

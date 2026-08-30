@@ -214,6 +214,7 @@ export type Claim = z.infer<typeof ClaimSchema>;
 
 export const MediaAnalysisSchema = z.object({
   kind: z.string(),
+  metadata_findings: z.record(z.string(), z.unknown()).default({}),
   manipulation_signals: z.array(z.record(z.string(), z.unknown())).default([]),
   metadata_captured_at: z.string().nullable().optional(),
   earliest_known_appearance: z.string().nullable().optional(),

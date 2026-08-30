@@ -205,6 +205,7 @@ async def get_verification(
         media_analyses=[
             MediaAnalysisResponse(
                 kind=m.kind.value,
+                metadata_findings=m.metadata_findings or {},
                 manipulation_signals=m.manipulation_signals or [],
                 metadata_captured_at=m.metadata_captured_at,
                 earliest_known_appearance=m.earliest_known_appearance,

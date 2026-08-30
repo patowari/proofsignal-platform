@@ -152,6 +152,10 @@ class MediaAnalysisResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
     kind: str
+    #: Metadata we could read: dimensions, camera, software, generator, C2PA,
+    #: and the conservative ai_generation_assessment. Never a verdict -- see
+    #: app/media/image_analysis.py on why we do not claim AI detection.
+    metadata_findings: dict = Field(default_factory=dict)
     manipulation_signals: list[dict] = Field(default_factory=list)
     metadata_captured_at: datetime | None = None
     earliest_known_appearance: datetime | None = None

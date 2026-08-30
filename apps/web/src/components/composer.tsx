@@ -269,6 +269,7 @@ function MediaPicker({
   isScreenshot: boolean;
   onScreenshot: (value: boolean) => void;
 }) {
+  const { t } = useLocale();
   const accept =
     mode === "image"
       ? "image/jpeg,image/png,image/gif,image/webp"
@@ -320,23 +321,23 @@ function MediaPicker({
 
       <div>
         <label htmlFor="composer-caption" className="text-sm font-medium">
-          Claim shown in this file{" "}
-          <span className="font-normal text-[var(--red)]">(required)</span>
+          {t("captionLabel")}{" "}
+          <span className="font-normal text-muted">{t("optional")}</span>
         </label>
-        {/* The caption is verified as its own claim: an authentic file can carry
-            a false caption, and the report keeps those separate. */}
+        {/* Optional on purpose. Someone may want the file itself examined --
+            metadata, provenance, whether it has been edited -- without making
+            any claim about what it shows. Requiring a caption forced them to
+            invent one. When given, it is verified as its own claim, because an
+            authentic file can carry a false caption. */}
         <p className="mt-0.5 text-xs text-muted">
-          Describe what this is said to show. This gives the checker a factual
-          claim it can assess immediately.
+          {t("captionHelp")}
         </p>
         <input
           id="composer-caption"
           type="text"
           value={caption}
           onChange={(e) => onCaption(e.target.value)}
-          placeholder="e.g. This shows flooding in Dhaka this week"
-          required
-          minLength={10}
+          placeholder={t("captionPlaceholder")}
           maxLength={2000}
           className="mt-2 w-full rounded-md border border-rule bg-transparent px-3 py-2 text-sm outline-none focus:border-current"
         />

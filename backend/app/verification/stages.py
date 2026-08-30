@@ -167,6 +167,22 @@ def stage_extracting_claims(ctx: PipelineContext) -> dict[str, Any]:
     ctx.session.flush()
 
     if not ctx.claims:
+        # A media submission with no caption and no readable text has nothing to
+        # check against evidence -- but the file analysis (metadata, provenance,
+        # capture date) is still worth reporting. Failing here would throw that
+        # away and tell the user nothing.
+        if ctx.submission.media_assets:
+            ctx.degrade("no_claims_from_media")
+            return {
+                "claim_count": 0,
+                "degraded": True,
+                "reason": "no_checkable_claim",
+                "detail": (
+                    "No caption was given and no text could be read from the file, so "
+                    "there is no factual claim to check. The file analysis below still "
+                    "applies."
+                ),
+            }
         raise StageFailedError(
             PipelineStage.EXTRACTING_CLAIMS.value,
             "No verifiable factual claims were found in this submission.",
@@ -334,22 +350,131 @@ def stage_classifying_evidence(ctx: PipelineContext) -> dict[str, Any]:
 
 
 def stage_analyzing_media(ctx: PipelineContext) -> dict[str, Any]:
-    """Analyze uploaded media.
+    """Analyze uploaded media: metadata, provenance, and embedded text.
 
-    Not yet implemented. Recorded as unavailable rather than as "nothing found",
-    so our own gap is never presented as a finding about the user's file.
+    Two rules govern this stage.
+
+    We do NOT claim to detect AI-generated images. No reliable general detector
+    exists, and a confident wrong answer here is a serious harm in both
+    directions. We report the provenance evidence we actually find, each with
+    its limits stated.
+
+    A missing capability is recorded as unavailable with a reason, never as a
+    finding about the file. "No OCR engine installed" must never reach a reader
+    as "no text found in this image".
     """
+    from app.core.enums import AnalysisAvailability, MediaKind
+    from app.media.image_analysis import analyze_image, extract_text
+    from app.models import MediaAnalysis
+    from app.services.storage import get_storage
+
     assets = ctx.submission.media_assets
     if not assets:
         return {"skipped": True, "reason": "no_media"}
 
-    ctx.degrade("media_analysis_not_implemented")
+    settings = get_settings_for_media()
+    storage = get_storage()
+
+    analyzed = 0
+    ocr_chars = 0
+    signals_found = 0
+    degraded_reasons: list[str] = []
+
+    for asset in assets:
+        if asset.kind is MediaKind.VIDEO:
+            # Video analysis is a later phase. Recorded honestly rather than
+            # silently skipped.
+            ctx.degrade("video_analysis_not_implemented")
+            degraded_reasons.append("video_analysis_not_implemented")
+            continue
+
+        try:
+            data = storage.get(asset.storage_key)
+        except Exception as exc:
+            logger.warning("media.read_failed", error_type=type(exc).__name__)
+            degraded_reasons.append("media_unreadable")
+            continue
+
+        forensics = analyze_image(data)
+
+        # OCR: extracted text becomes claims of its own, tagged OCR_TEXT so the
+        # report keeps them separate from the user's caption.
+        ocr_text, ocr_reason = extract_text(data, languages=settings.ocr_languages)
+        if ocr_text is None:
+            ocr_status = AnalysisAvailability.UNAVAILABLE
+            ctx.degrade("ocr_unavailable")
+        else:
+            ocr_status = AnalysisAvailability.COMPLETED
+            ocr_chars += len(ocr_text)
+            if ocr_text.strip():
+                existing = ctx.text_by_origin.get(ClaimOrigin.OCR_TEXT.value, "")
+                ctx.text_by_origin[ClaimOrigin.OCR_TEXT.value] = f"{existing}\n{ocr_text}".strip()
+
+        analysis = MediaAnalysis(
+            verification_id=ctx.verification.id,
+            media_asset_id=asset.id,
+            kind=asset.kind,
+            metadata_findings={
+                "width": forensics.width,
+                "height": forensics.height,
+                "format": forensics.format,
+                "camera": forensics.camera,
+                "software": forensics.software,
+                "generator": forensics.generator,
+                "has_c2pa": forensics.has_c2pa,
+                "has_exif": forensics.has_exif,
+                # Deliberately not a verdict: "declared_generator",
+                # "provenance_present", or "undetermined".
+                "ai_generation_assessment": forensics.ai_generation_assessment,
+            },
+            manipulation_signals=[
+                {
+                    "type": signal.key,
+                    "description": signal.finding,
+                    "caveat": signal.caveat,
+                    "strength": signal.strength,
+                }
+                for signal in forensics.signals
+            ],
+            metadata_captured_at=forensics.captured_at,
+            ocr_status=ocr_status,
+            ocr_text=(ocr_text or None),
+            ocr_engine="tesseract" if ocr_text is not None else None,
+            ocr_unavailable_reason=(ocr_reason or None) if ocr_text is None else None,
+            analysis_availability={
+                "metadata": AnalysisAvailability.COMPLETED.value,
+                "ocr": ocr_status.value,
+                # Stated explicitly so the report can explain the absence rather
+                # than leaving a reader to assume we checked.
+                "ai_detection": AnalysisAvailability.UNAVAILABLE.value,
+                "ai_detection_reason": (
+                    "No reliable general detector for AI-generated images exists. "
+                    "We report provenance metadata instead of guessing."
+                ),
+                "reverse_image_search": AnalysisAvailability.UNAVAILABLE.value,
+            },
+        )
+        ctx.session.add(analysis)
+        ctx.media_analyses.append(analysis)
+        analyzed += 1
+        signals_found += len(forensics.signals)
+
+    ctx.session.flush()
+
     return {
-        "degraded": True,
-        "reason": "media_analysis_not_implemented",
-        "asset_count": len(assets),
-        "detail": "Media analysis is not yet available; the file was stored but not analyzed.",
+        "assets_analyzed": analyzed,
+        "signals_found": signals_found,
+        "ocr_chars": ocr_chars,
+        "degraded": bool(degraded_reasons),
+        "degradation": degraded_reasons[:3],
     }
+
+
+def get_settings_for_media():  # type: ignore[no-untyped-def]
+    """Settings accessor kept local so the stage module has no import cycle."""
+    from app.core.config import get_settings
+
+    return get_settings()
 
 
 def stage_scoring(ctx: PipelineContext) -> dict[str, Any]:
@@ -359,6 +484,11 @@ def stage_scoring(ctx: PipelineContext) -> dict[str, Any]:
     UNVERIFIED at LOW confidence.
     """
     if not ctx.claims:
+        if ctx.submission.media_assets:
+            # Nothing to score, but the media findings still form a report.
+            ctx.verification.overall_verdict = None
+            ctx.verification.confidence_band = None
+            return {"claims_scored": 0, "reason": "media_only_submission"}
         raise StageFailedError(PipelineStage.SCORING.value, "There are no claims to score.")
 
     claim_scores = []

@@ -455,67 +455,189 @@ function OriginalSubmission({ report }: { report: VerificationReport }) {
 }
 
 function MediaAnalysisSection({ analyses }: { analyses: MediaAnalysis[] }) {
+  const { locale, t } = useLocale();
+
   return (
     <section aria-labelledby="media-heading">
       <SectionHeading
         id="media-heading"
-        title="Media analysis"
-        description="File integrity and claim context are assessed separately."
+        title={locale === "bn" ? "ফাইল বিশ্লেষণ" : "File analysis"}
+        description={
+          locale === "bn"
+            ? "ফাইলটি নিজে কী বলছে, আর দাবিটি সত্য কি না — দুটি আলাদা প্রশ্ন।"
+            : "What the file itself shows, assessed separately from whether the claim is true."
+        }
       />
       <div className="mt-5 space-y-4">
-        {analyses.map((analysis, index) => (
-          <div
-            key={index}
-            className="grid gap-4 rounded-lg border border-rule bg-surface p-5 sm:grid-cols-2"
-          >
-            <div>
-              <h3 className="text-sm font-semibold">File integrity</h3>
-              {analysis.manipulation_signals.length > 0 ? (
-                <ul className="mt-2 space-y-1 text-sm">
-                  {analysis.manipulation_signals.map((signal, i) => (
-                    <li key={i}>{String(signal.description ?? signal.type)}</li>
-                  ))}
-                </ul>
-              ) : (
-                <p className="mt-2 text-sm text-muted">
-                  No manipulation signals were detected in the file itself.
-                </p>
-              )}
-              {analysis.ocr_status === "UNAVAILABLE" ? (
-                // Never render our missing tooling as a finding about the file.
-                <p className="mt-2 text-xs text-muted">
-                  Text inside the image could not be read:{" "}
-                  {analysis.ocr_unavailable_reason ??
-                    "no OCR engine is available"}
-                  . This does not mean the image contains no text.
-                </p>
-              ) : null}
-            </div>
+        {analyses.map((analysis, index) => {
+          const meta = (analysis as unknown as {
+            metadata_findings?: Record<string, unknown> | null;
+          }).metadata_findings;
+          const assessment = String(meta?.ai_generation_assessment ?? "undetermined");
+          const generator = meta?.generator ? String(meta.generator) : null;
 
-            <div>
-              <h3 className="text-sm font-semibold">Context</h3>
-              {analysis.predates_claimed_event ? (
-                <p className="mt-2 text-sm">
-                  This file appears to predate the event it is said to show.
-                </p>
-              ) : analysis.corpus_matches.length > 0 ? (
-                <p className="mt-2 text-sm">
-                  Found {analysis.corpus_matches.length} similar{" "}
-                  {analysis.corpus_matches.length === 1 ? "item" : "items"} in
-                  our indexed sources.
-                </p>
-              ) : (
-                <p className="mt-2 text-sm text-muted">
-                  We found no matching copy in our indexed sources. We cannot
-                  search the wider web, so this does not establish where the
-                  file originated.
-                </p>
-              )}
+          return (
+            <div key={index} className="rounded-lg border border-rule bg-surface p-5">
+              {/* The question everyone asks first, answered honestly. */}
+              <AiGenerationPanel
+                assessment={assessment}
+                generator={generator}
+                locale={locale}
+              />
+
+              <div className="mt-5 grid gap-5 border-t border-rule pt-5 sm:grid-cols-2">
+                <div>
+                  <h3 className="text-sm font-semibold">
+                    {locale === "bn" ? "ফাইল থেকে যা জানা গেল" : "What the file shows"}
+                  </h3>
+                  {analysis.manipulation_signals.length > 0 ? (
+                    <ul className="mt-2.5 space-y-3">
+                      {analysis.manipulation_signals.map((signal, i) => (
+                        <li key={i} className="text-sm">
+                          <p>{String(signal.description ?? signal.type ?? "")}</p>
+                          {signal.caveat ? (
+                            // The caveat is the point: a signal without its
+                            // limits is how a hint becomes a false conclusion.
+                            <p className="mt-1 text-xs leading-relaxed text-muted">
+                              {String(signal.caveat)}
+                            </p>
+                          ) : null}
+                        </li>
+                      ))}
+                    </ul>
+                  ) : (
+                    <p className="mt-2 text-sm text-muted">
+                      {locale === "bn"
+                        ? "ফাইলটি থেকে উল্লেখযোগ্য কোনো তথ্য পাওয়া যায়নি।"
+                        : "No readable metadata was found in this file."}
+                    </p>
+                  )}
+                </div>
+
+                <div>
+                  <h3 className="text-sm font-semibold">
+                    {locale === "bn" ? "ছবির ভেতরের লেখা" : "Text in the image"}
+                  </h3>
+                  {analysis.ocr_status === "UNAVAILABLE" ? (
+                    // Our gap, never presented as a finding about their file.
+                    <p className="mt-2 text-sm text-muted">
+                      {locale === "bn"
+                        ? `ছবির লেখা পড়া যায়নি (${analysis.ocr_unavailable_reason ?? "OCR চালু নেই"})। এর মানে ছবিতে কোনো লেখা নেই, তা নয়।`
+                        : `We could not read text from this image (${analysis.ocr_unavailable_reason ?? "no OCR engine available"}). This does not mean the image contains no text.`}
+                    </p>
+                  ) : analysis.ocr_text ? (
+                    <blockquote
+                      className="mt-2 border-l-2 border-rule pl-3 text-sm leading-relaxed"
+                      dir="auto"
+                    >
+                      {analysis.ocr_text.slice(0, 400)}
+                    </blockquote>
+                  ) : (
+                    <p className="mt-2 text-sm text-muted">
+                      {locale === "bn"
+                        ? "ছবিতে পড়ার মতো কোনো লেখা পাওয়া যায়নি।"
+                        : "No readable text was found in this image."}
+                    </p>
+                  )}
+                </div>
+              </div>
+
+              <div className="mt-5 border-t border-rule pt-5">
+                <h3 className="text-sm font-semibold">
+                  {locale === "bn" ? "এই ছবি আগে কোথাও ছিল কি না" : "Where this file came from"}
+                </h3>
+                {analysis.predates_claimed_event ? (
+                  <p className="mt-2 text-sm">
+                    {locale === "bn"
+                      ? "এই ফাইলটি দাবি করা ঘটনার আগের বলে মনে হচ্ছে।"
+                      : "This file appears to predate the event it is said to show."}
+                  </p>
+                ) : analysis.corpus_matches.length > 0 ? (
+                  <p className="mt-2 text-sm">
+                    {locale === "bn"
+                      ? `আমাদের সংগ্রহে ${analysis.corpus_matches.length}টি মিল পাওয়া গেছে।`
+                      : `Found ${analysis.corpus_matches.length} similar ${analysis.corpus_matches.length === 1 ? "item" : "items"} in our indexed sources.`}
+                  </p>
+                ) : (
+                  <p className="mt-2 text-sm text-muted">
+                    {locale === "bn"
+                      ? "আমাদের সংগ্রহে এই ছবির কোনো কপি পাওয়া যায়নি। আমরা ছবি দিয়ে পুরো ইন্টারনেট খুঁজতে পারি না, তাই ছবিটি কোথা থেকে এসেছে তা এতে প্রমাণ হয় না।"
+                      : "We found no matching copy in our indexed sources. We cannot search the wider web by image, so this does not establish where the file originated."}
+                  </p>
+                )}
+              </div>
             </div>
-          </div>
-        ))}
+          );
+        })}
       </div>
     </section>
+  );
+}
+
+/**
+ * The AI-generation question, answered honestly.
+ *
+ * We deliberately do not output a yes/no. No reliable general detector exists,
+ * and a confident wrong answer causes real harm in both directions -- calling a
+ * genuine photograph synthetic, or clearing a fabrication. So we report the
+ * provenance evidence we actually have, and say plainly when we have none.
+ */
+function AiGenerationPanel({
+  assessment,
+  generator,
+  locale,
+}: {
+  assessment: string;
+  generator: string | null;
+  locale: Locale;
+}) {
+  if (assessment === "declared_generator" && generator) {
+    return (
+      <div className="rounded-md border border-amber-300 bg-amber-50 p-4 dark:border-amber-900 dark:bg-amber-950/30">
+        <p className="text-sm font-semibold">
+          {locale === "bn"
+            ? `ফাইলের তথ্যে ${generator}-এর নাম রয়েছে`
+            : `The file's metadata names ${generator}`}
+        </p>
+        <p className="mt-1.5 text-sm leading-relaxed opacity-90">
+          {locale === "bn"
+            ? "এটি শক্ত ইঙ্গিত যে ছবিটি এআই দিয়ে তৈরি বা সম্পাদিত। তবে মেটাডেটা বদলানো যায়, তাই এটি চূড়ান্ত প্রমাণ নয়।"
+            : "This is strong evidence the image was produced or processed by that tool. Metadata can be edited, so it is not proof."}
+        </p>
+      </div>
+    );
+  }
+
+  if (assessment === "provenance_present") {
+    return (
+      <div className="rounded-md border border-rule p-4">
+        <p className="text-sm font-semibold">
+          {locale === "bn"
+            ? "ফাইলটিতে Content Credentials (C2PA) তথ্য আছে"
+            : "This file carries Content Credentials (C2PA)"}
+        </p>
+        <p className="mt-1.5 text-sm leading-relaxed text-muted">
+          {locale === "bn"
+            ? "ক্যামেরা ও এআই — দুই ধরনের সরঞ্জামই এই তথ্য যুক্ত করে। আমরা এর স্বাক্ষর যাচাই করিনি।"
+            : "Both cameras and AI generators attach these. We detected the manifest but did not validate its signature."}
+        </p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="rounded-md border border-rule p-4">
+      <p className="text-sm font-semibold">
+        {locale === "bn"
+          ? "ছবিটি এআই দিয়ে তৈরি কি না, আমরা বলতে পারছি না"
+          : "We cannot tell whether this image is AI-generated"}
+      </p>
+      <p className="mt-1.5 text-sm leading-relaxed text-muted">
+        {locale === "bn"
+          ? "এআই-তৈরি ছবি নির্ভরযোগ্যভাবে শনাক্ত করার কোনো পদ্ধতি এখনো নেই — প্রচলিত টুলগুলো প্রায়ই ভুল করে, বিশেষ করে ছবি একবার শেয়ার বা সংকুচিত হলে। ভুল উত্তর দেওয়ার চেয়ে আমরা বরং জানাই যে আমরা নিশ্চিত নই, এবং ফাইল থেকে যা যা পেয়েছি তা নিচে দেখাই।"
+          : "There is no reliable way to detect AI-generated images. Published tools are frequently wrong, especially once an image has been shared, resized, or recompressed. Rather than give you an answer we cannot stand behind, we report what the file itself reveals below."}
+      </p>
+    </div>
   );
 }
 

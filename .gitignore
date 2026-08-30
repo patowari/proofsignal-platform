@@ -44,3 +44,6 @@ Thumbs.db
 
 # Alembic local state
 backend/alembic/versions/__pycache__/
+
+# Playwright browsers
+apps/web/test-results/

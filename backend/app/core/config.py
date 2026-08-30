@@ -105,6 +105,9 @@ class Settings(BaseSettings):
 
     # ---- Pipeline / worker ----------------------------------------------
     queue_name: str = "verification"
+    #: How long a worker blocks waiting for a job. The Redis socket timeout is
+    #: derived from this, so raising it here cannot strand a worker.
+    queue_block_timeout_seconds: int = 5
     worker_concurrency: int = 2
     job_max_retries: int = 3
     job_timeout_seconds: int = 900

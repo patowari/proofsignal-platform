@@ -79,7 +79,15 @@ class JobQueue:
         settings = get_settings()
         self.name = name or settings.queue_name
         self._redis = redis_client or redis.Redis.from_url(
-            settings.redis_url, decode_responses=True
+            settings.redis_url,
+            decode_responses=True,
+            # A blocking BRPOPLPUSH holds the socket open for its full timeout.
+            # The socket timeout must exceed that, or an idle queue looks like a
+            # dead connection and kills the worker. Health checks keep an idle
+            # connection from being dropped by an intermediary.
+            socket_timeout=settings.queue_block_timeout_seconds + 10,
+            socket_keepalive=True,
+            health_check_interval=30,
         )
         # Identifies this worker's processing list, so concurrent workers do not
         # reclaim each other's in-flight jobs.
@@ -107,11 +115,13 @@ class JobQueue:
 
     # ---- Consuming ------------------------------------------------------
 
-    def reserve(self, timeout: int = 5) -> Job | None:
+    def reserve(self, timeout: int | None = None) -> Job | None:
         """Claim the next job, atomically moving it to this worker's list.
 
         Returns None when the queue stays empty for `timeout` seconds.
         """
+        if timeout is None:
+            timeout = get_settings().queue_block_timeout_seconds
         raw = self._redis.brpoplpush(self.pending_key, self.processing_key(), timeout=timeout)
         if raw is None:
             return None

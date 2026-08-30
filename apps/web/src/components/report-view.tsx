@@ -1,0 +1,533 @@
+/**
+ * Verification report.
+ *
+ * Visual priority, in order: verdict, claims, evidence, explanation.
+ * Contradicting evidence is always shown, whatever the overall verdict --
+ * hiding it would defeat the point of the product.
+ */
+
+import {
+  CircleHelp,
+  ExternalLink,
+  MinusCircle,
+  ThumbsDown,
+  ThumbsUp,
+} from "lucide-react";
+import type {
+  Claim,
+  Evidence,
+  MediaAnalysis,
+  VerificationReport,
+} from "@/lib/api/schemas";
+import { cn, formatDate, hostFromUrl } from "@/lib/utils";
+import {
+  claimTypeLabel,
+  degradationLabel,
+  originLabel,
+  relationshipLabel,
+  verdictPresentation,
+} from "@/lib/verdict";
+import { ShareButton } from "./share-button";
+import { VerdictBadge, VerdictBanner } from "./verdict-display";
+
+export function ReportView({ report }: { report: VerificationReport }) {
+  const unresolved = report.claims.filter(
+    (c) => !c.verdict || c.verdict === "UNVERIFIED",
+  );
+  const hasEvidence = report.total_evidence > 0;
+
+  return (
+    <article className="space-y-12">
+      {/* 1. VERDICT */}
+      <VerdictBanner
+        verdict={report.overall_verdict}
+        confidence={report.confidence_band}
+      />
+
+      {report.summary ? (
+        <section aria-labelledby="summary-heading">
+          <h2 id="summary-heading" className="sr-only">
+            Summary
+          </h2>
+          <p className="font-serif text-lg leading-relaxed sm:text-xl">
+            {report.summary}
+          </p>
+        </section>
+      ) : null}
+
+      {report.degradation_reasons.length > 0 ? (
+        <LimitationsPanel reasons={report.degradation_reasons} />
+      ) : null}
+
+      <OriginalSubmission report={report} />
+
+      {/* 2. CLAIMS */}
+      {report.claims.length > 0 ? (
+        <section aria-labelledby="claims-heading">
+          <SectionHeading
+            id="claims-heading"
+            title="Claims we checked"
+            description={`${report.claims.length} ${
+              report.claims.length === 1 ? "claim" : "claims"
+            } extracted from this submission, each checked separately.`}
+          />
+          <ol className="mt-5 space-y-4">
+            {report.claims.map((claim, index) => (
+              <li key={`${claim.sequence}-${index}`}>
+                <ClaimCard claim={claim} index={index + 1} />
+              </li>
+            ))}
+          </ol>
+        </section>
+      ) : null}
+
+      {/* 3. EVIDENCE */}
+      <section aria-labelledby="evidence-heading">
+        <SectionHeading
+          id="evidence-heading"
+          title="Evidence"
+          description={
+            hasEvidence
+              ? `${report.independent_origins} independent ${
+                  report.independent_origins === 1 ? "source" : "sources"
+                } behind ${report.total_evidence} ${
+                  report.total_evidence === 1 ? "item" : "items"
+                }.`
+              : undefined
+          }
+        />
+        {hasEvidence ? (
+          <div className="mt-5 grid gap-4 sm:grid-cols-2">
+            <EvidenceTally
+              tone="support"
+              count={report.supporting_evidence}
+              label="Supporting"
+            />
+            <EvidenceTally
+              tone="contradict"
+              count={report.contradicting_evidence}
+              label="Contradicting"
+            />
+          </div>
+        ) : (
+          <NoEvidencePanel />
+        )}
+      </section>
+
+      {/* 4. WHAT REMAINS UNKNOWN */}
+      {unresolved.length > 0 ? (
+        <section aria-labelledby="unknown-heading">
+          <SectionHeading
+            id="unknown-heading"
+            title="What remains unknown"
+            description="We could not settle these claims either way."
+          />
+          <ul className="mt-5 space-y-3">
+            {unresolved.map((claim, index) => (
+              <li
+                key={`unresolved-${index}`}
+                className="flex gap-3 rounded-lg border border-rule bg-surface p-4"
+              >
+                <CircleHelp
+                  className="mt-0.5 h-4 w-4 shrink-0 text-muted"
+                  aria-hidden="true"
+                />
+                <p className="text-sm leading-relaxed">{claim.claim_text}</p>
+              </li>
+            ))}
+          </ul>
+          <p className="mt-4 text-sm text-muted">
+            Unverified is not the same as false. It means the evidence available
+            to us was not enough to decide.
+          </p>
+        </section>
+      ) : null}
+
+      {report.media_analyses.length > 0 ? (
+        <MediaAnalysisSection analyses={report.media_analyses} />
+      ) : null}
+
+      <MethodologySection report={report} />
+
+      <div className="flex flex-wrap items-center gap-3 border-t border-rule pt-6">
+        <ShareButton publicId={report.public_id} />
+      </div>
+    </article>
+  );
+}
+
+function SectionHeading({
+  id,
+  title,
+  description,
+}: {
+  id: string;
+  title: string;
+  description?: string;
+}) {
+  return (
+    <div className="border-b border-rule pb-3">
+      <h2 id={id} className="font-serif text-2xl font-semibold">
+        {title}
+      </h2>
+      {description ? (
+        <p className="mt-1 text-sm text-muted">{description}</p>
+      ) : null}
+    </div>
+  );
+}
+
+function ClaimCard({ claim, index }: { claim: Claim; index: number }) {
+  const presentation = verdictPresentation(claim.verdict);
+  const supporting = claim.evidence.filter((e) => e.relationship === "SUPPORTS");
+  const contradicting = claim.evidence.filter(
+    (e) => e.relationship === "CONTRADICTS",
+  );
+
+  return (
+    <div className="rounded-lg border border-rule bg-surface p-5">
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div className="min-w-0 flex-1">
+          <div className="flex items-center gap-2 text-xs text-muted">
+            <span className="font-medium">Claim {index}</span>
+            <span aria-hidden="true">·</span>
+            <span>{claimTypeLabel(claim.claim_type)}</span>
+            {/* Origin matters: an authentic file can carry a false caption. */}
+            {claim.origin !== "USER_TEXT" ? (
+              <>
+                <span aria-hidden="true">·</span>
+                <span>{originLabel(claim.origin)}</span>
+              </>
+            ) : null}
+          </div>
+          <p
+            className="mt-2 leading-relaxed"
+            lang={claim.language}
+            dir="auto"
+          >
+            {claim.claim_text}
+          </p>
+        </div>
+        <VerdictBadge verdict={claim.verdict} size="small" />
+      </div>
+
+      {claim.evidence.length > 0 ? (
+        <div className="mt-5 space-y-4 border-t border-rule pt-4">
+          {supporting.length > 0 ? (
+            <EvidenceGroup
+              title="Supporting evidence"
+              items={supporting}
+              tone="support"
+            />
+          ) : null}
+          {/* Always rendered when present, even under a positive verdict. */}
+          {contradicting.length > 0 ? (
+            <EvidenceGroup
+              title="Contradicting evidence"
+              items={contradicting}
+              tone="contradict"
+            />
+          ) : null}
+        </div>
+      ) : (
+        <p className="mt-4 border-t border-rule pt-4 text-sm text-muted">
+          No evidence was found for this claim.
+        </p>
+      )}
+
+      {claim.independent_origins > 0 && claim.evidence.length > claim.independent_origins ? (
+        <p className="mt-3 text-xs text-muted">
+          {claim.evidence.length} items trace back to{" "}
+          {claim.independent_origins} independent{" "}
+          {claim.independent_origins === 1 ? "source" : "sources"}. Republished
+          copies are counted once.
+        </p>
+      ) : null}
+    </div>
+  );
+}
+
+function EvidenceGroup({
+  title,
+  items,
+  tone,
+}: {
+  title: string;
+  items: Evidence[];
+  tone: "support" | "contradict";
+}) {
+  const Icon = tone === "support" ? ThumbsUp : ThumbsDown;
+  return (
+    <div>
+      <h4 className="flex items-center gap-2 text-sm font-medium">
+        <Icon
+          className={cn(
+            "h-3.5 w-3.5",
+            tone === "support"
+              ? "text-emerald-600 dark:text-emerald-400"
+              : "text-rose-600 dark:text-rose-400",
+          )}
+          aria-hidden="true"
+        />
+        {title}
+      </h4>
+      <ul className="mt-2.5 space-y-3">
+        {items.map((item, index) => (
+          <li key={index}>
+            <EvidenceItem evidence={item} />
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
+function EvidenceItem({ evidence }: { evidence: Evidence }) {
+  const host = hostFromUrl(evidence.document_url) ?? evidence.source_domain;
+
+  return (
+    <div className="border-l-2 border-rule pl-4">
+      <blockquote className="text-sm leading-relaxed" dir="auto">
+        {evidence.evidence_text}
+      </blockquote>
+      <div className="mt-2 flex flex-wrap items-center gap-x-2.5 gap-y-1 text-xs text-muted">
+        <span className="font-medium">{relationshipLabel(evidence.relationship)}</span>
+        {host ? (
+          <>
+            <span aria-hidden="true">·</span>
+            <span>{evidence.source_name ?? host}</span>
+          </>
+        ) : null}
+        {evidence.published_at ? (
+          <>
+            <span aria-hidden="true">·</span>
+            <time dateTime={evidence.published_at}>
+              {formatDate(evidence.published_at)}
+            </time>
+          </>
+        ) : null}
+        {evidence.document_url ? (
+          <>
+            <span aria-hidden="true">·</span>
+            <a
+              href={evidence.document_url}
+              target="_blank"
+              rel="noopener noreferrer nofollow"
+              className="inline-flex items-center gap-1 underline"
+            >
+              Source
+              <ExternalLink className="h-3 w-3" aria-hidden="true" />
+            </a>
+          </>
+        ) : null}
+      </div>
+    </div>
+  );
+}
+
+function EvidenceTally({
+  tone,
+  count,
+  label,
+}: {
+  tone: "support" | "contradict";
+  count: number;
+  label: string;
+}) {
+  const Icon = tone === "support" ? ThumbsUp : ThumbsDown;
+  return (
+    <div className="rounded-lg border border-rule bg-surface p-5">
+      <div className="flex items-center gap-2 text-sm text-muted">
+        <Icon className="h-4 w-4" aria-hidden="true" />
+        {label}
+      </div>
+      <p className="mt-2 font-serif text-3xl font-semibold tabular-nums">
+        {count}
+      </p>
+    </div>
+  );
+}
+
+function NoEvidencePanel() {
+  return (
+    <div className="mt-5 rounded-lg border border-rule bg-surface p-5">
+      <p className="text-sm leading-relaxed">
+        We did not find any evidence for or against this submission.
+      </p>
+      <p className="mt-2 text-sm leading-relaxed text-muted">
+        That is a statement about our coverage, not about the claim. Absence of
+        evidence is not evidence that something is false.
+      </p>
+    </div>
+  );
+}
+
+function LimitationsPanel({ reasons }: { reasons: string[] }) {
+  return (
+    <section
+      aria-labelledby="limitations-heading"
+      className="rounded-lg border border-amber-300 bg-amber-50 p-5 dark:border-amber-900 dark:bg-amber-950/30"
+    >
+      <h2 id="limitations-heading" className="text-sm font-semibold">
+        Limitations in this check
+      </h2>
+      <ul className="mt-2.5 space-y-1.5 text-sm leading-relaxed opacity-90">
+        {reasons.map((reason) => (
+          <li key={reason}>{degradationLabel(reason)}</li>
+        ))}
+      </ul>
+    </section>
+  );
+}
+
+function OriginalSubmission({ report }: { report: VerificationReport }) {
+  const { submission } = report;
+  return (
+    <section aria-labelledby="submission-heading">
+      <SectionHeading
+        id="submission-heading"
+        title="What was submitted"
+      />
+      <div className="mt-5 rounded-lg border border-rule bg-surface p-5">
+        {submission.title ? (
+          <h3 className="font-medium">{submission.title}</h3>
+        ) : null}
+        {submission.text ? (
+          <p
+            className="mt-2 whitespace-pre-wrap text-sm leading-relaxed"
+            lang={submission.detected_language ?? undefined}
+            dir="auto"
+          >
+            {submission.text}
+          </p>
+        ) : null}
+        {submission.submitted_url ? (
+          <div className="scroll-x mt-2">
+            <a
+              href={submission.submitted_url}
+              target="_blank"
+              rel="noopener noreferrer nofollow"
+              className="inline-flex items-center gap-1 break-all text-sm underline"
+            >
+              {submission.submitted_url}
+              <ExternalLink className="h-3 w-3 shrink-0" aria-hidden="true" />
+            </a>
+          </div>
+        ) : null}
+        {submission.caption ? (
+          <div className="mt-3 border-t border-rule pt-3">
+            <p className="text-xs font-medium text-muted">
+              Caption supplied with this file
+            </p>
+            <p className="mt-1 text-sm leading-relaxed" dir="auto">
+              {submission.caption}
+            </p>
+          </div>
+        ) : null}
+      </div>
+    </section>
+  );
+}
+
+function MediaAnalysisSection({ analyses }: { analyses: MediaAnalysis[] }) {
+  return (
+    <section aria-labelledby="media-heading">
+      <SectionHeading
+        id="media-heading"
+        title="Media analysis"
+        description="File integrity and claim context are assessed separately."
+      />
+      <div className="mt-5 space-y-4">
+        {analyses.map((analysis, index) => (
+          <div
+            key={index}
+            className="grid gap-4 rounded-lg border border-rule bg-surface p-5 sm:grid-cols-2"
+          >
+            <div>
+              <h3 className="text-sm font-semibold">File integrity</h3>
+              {analysis.manipulation_signals.length > 0 ? (
+                <ul className="mt-2 space-y-1 text-sm">
+                  {analysis.manipulation_signals.map((signal, i) => (
+                    <li key={i}>{String(signal.description ?? signal.type)}</li>
+                  ))}
+                </ul>
+              ) : (
+                <p className="mt-2 text-sm text-muted">
+                  No manipulation signals were detected in the file itself.
+                </p>
+              )}
+              {analysis.ocr_status === "UNAVAILABLE" ? (
+                // Never render our missing tooling as a finding about the file.
+                <p className="mt-2 text-xs text-muted">
+                  Text inside the image could not be read:{" "}
+                  {analysis.ocr_unavailable_reason ??
+                    "no OCR engine is available"}
+                  . This does not mean the image contains no text.
+                </p>
+              ) : null}
+            </div>
+
+            <div>
+              <h3 className="text-sm font-semibold">Context</h3>
+              {analysis.predates_claimed_event ? (
+                <p className="mt-2 text-sm">
+                  This file appears to predate the event it is said to show.
+                </p>
+              ) : analysis.corpus_matches.length > 0 ? (
+                <p className="mt-2 text-sm">
+                  Found {analysis.corpus_matches.length} similar{" "}
+                  {analysis.corpus_matches.length === 1 ? "item" : "items"} in
+                  our indexed sources.
+                </p>
+              ) : (
+                <p className="mt-2 text-sm text-muted">
+                  We found no matching copy in our indexed sources. We cannot
+                  search the wider web, so this does not establish where the
+                  file originated.
+                </p>
+              )}
+            </div>
+          </div>
+        ))}
+      </div>
+    </section>
+  );
+}
+
+function MethodologySection({ report }: { report: VerificationReport }) {
+  return (
+    <section aria-labelledby="method-heading">
+      <SectionHeading id="method-heading" title="How this was checked" />
+      <div className="mt-5 space-y-4 text-sm leading-relaxed text-muted">
+        <p>
+          We break a submission into individually checkable claims, search our
+          indexed sources for relevant passages, label each passage as
+          supporting or contradicting, and compute the verdict with a fixed,
+          published formula. The language model never decides the verdict.
+        </p>
+        <p>
+          Republished copies of one report are grouped and counted as a single
+          source, so widespread repetition does not raise confidence on its own.
+        </p>
+        <dl className="grid gap-x-6 gap-y-2 border-t border-rule pt-4 sm:grid-cols-2">
+          <div className="flex justify-between gap-4">
+            <dt>Checked</dt>
+            <dd className="tabular-nums">{formatDate(report.created_at)}</dd>
+          </div>
+          <div className="flex justify-between gap-4">
+            <dt>Scoring version</dt>
+            <dd className="tabular-nums">{report.scoring_version}</dd>
+          </div>
+          <div className="flex justify-between gap-4">
+            <dt>Pipeline version</dt>
+            <dd className="tabular-nums">{report.pipeline_version}</dd>
+          </div>
+          <div className="flex justify-between gap-4">
+            <dt>Retrieval version</dt>
+            <dd className="tabular-nums">{report.retrieval_version}</dd>
+          </div>
+        </dl>
+      </div>
+    </section>
+  );
+}

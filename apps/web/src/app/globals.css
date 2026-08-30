@@ -1,0 +1,100 @@
+@import "tailwindcss";
+
+/**
+ * Editorial newsroom / research tool.
+ *
+ * Restrained neutral palette, serious typography, generous whitespace. No neon
+ * gradients, no glassmorphism, no glowing AI motifs -- credibility comes from
+ * clarity and hierarchy, not decoration.
+ */
+
+@theme {
+  --font-sans: var(--font-inter), ui-sans-serif, system-ui, -apple-system,
+    "Segoe UI", sans-serif;
+  --font-serif: var(--font-source-serif), Georgia, Cambria, "Times New Roman",
+    serif;
+
+  /* Warm off-white ground: easier on the eye than pure white for long reading. */
+  --color-paper: #fbfaf8;
+  --color-ink: #16161a;
+}
+
+:root {
+  --background: #fbfaf8;
+  --foreground: #16161a;
+  --muted: #6b6b76;
+  --rule: #e4e2dd;
+  --surface: #ffffff;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --background: #101014;
+    --foreground: #f2f1ee;
+    --muted: #9a9aa5;
+    --rule: #2a2a32;
+    --surface: #17171d;
+  }
+}
+
+@layer base {
+  body {
+    background: var(--background);
+    color: var(--foreground);
+    font-family: var(--font-sans);
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+  }
+
+  /* Headlines carry the editorial character. */
+  h1,
+  h2,
+  h3 {
+    font-family: var(--font-serif);
+    letter-spacing: -0.02em;
+  }
+
+  /* Visible focus everywhere: the product must be fully keyboard-operable. */
+  :focus-visible {
+    outline: 2px solid currentColor;
+    outline-offset: 2px;
+    border-radius: 2px;
+  }
+
+  /* Long claim text and URLs must never force horizontal page scroll. */
+  p,
+  li,
+  blockquote {
+    overflow-wrap: break-word;
+  }
+}
+
+@layer utilities {
+  .text-muted {
+    color: var(--muted);
+  }
+  .border-rule {
+    border-color: var(--rule);
+  }
+  .bg-surface {
+    background-color: var(--surface);
+  }
+
+  /* Wide content (tables, long URLs) scrolls inside its own container. */
+  .scroll-x {
+    overflow-x: auto;
+    max-width: 100%;
+  }
+}
+
+/* Respect reduced-motion: progress is information, not entertainment. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
